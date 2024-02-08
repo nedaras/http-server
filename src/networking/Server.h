@@ -14,6 +14,7 @@ public:
 private:
 
   std::function<void()> m_callback;
+  int m_listenSocket;
 
 };
 
