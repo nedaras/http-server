@@ -1,10 +1,14 @@
 #include <iostream>
-#include "test.h"
+#include "networking/Server.h"
 
 int main()
 {
 
-  std::cout << test::getPsw() << std::endl;
+  Server server(nullptr);
+
+  server.listen("8080");
+
+  return 0;
 
 }
 
