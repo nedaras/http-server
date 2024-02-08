@@ -4,6 +4,7 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <iostream>
+#include <string>
 
 int Server::listen(const char* port)
 {
@@ -52,11 +53,22 @@ int Server::listen(const char* port)
 
   char buffer[8 * 1024];
 
-  int bytes = recv(clientSocket, buffer, sizeof(buffer), 0);
+  ssize_t bytes;
+  size_t bufferSize = 0;
+
+  while ((bytes = recv(clientSocket, buffer + bufferSize, sizeof(buffer) - bufferSize, 0)) == -1);
+ 
+  bufferSize += bytes;
+
+  std::cout.write(buffer, bufferSize);
   
-  std::cout.write(buffer, bytes);
+  std::string html = "<form method='post'><label for='a'>TEXT:</label><input type='text' id='a' name='input' required><<button type='submit'>SEND</button></form>";
+  std::string http = std::string("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ") + std::to_string(html.size()) + "\r\n\r\n" + html;
+
+  send(clientSocket, http.c_str(), http.size(), 0);  
 
   close(clientSocket); 
+  close(m_listenSocket);
 
   return 0; 
 
