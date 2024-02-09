@@ -9,6 +9,25 @@
 #include <iostream>
 #include <string>
 
+static bool isEOF(const char* buffer, size_t bufferLength, size_t bytesRead)
+{
+
+  for (ssize_t i = bufferLength; i < bufferLength + bytesRead; i++) // find end of header
+  {
+
+    if (buffer[i] == '\n' && i - 3 >= 0)
+    {
+
+      if(std::strncmp(&buffer[i] - 3, "\r\n\r\n", 4) == 0) return 1;
+
+    }
+
+  }
+  
+  return 0;
+
+}
+
 int Server::listen(const char* port)
 {
   
@@ -56,38 +75,19 @@ int Server::listen(const char* port)
 
   char buffer[8 * 1024];
   size_t chunk_size = 1024;
-  //ssize_t bytes;
-  // size_t bufferSize = 0;
+  size_t bufferSize = 0;
 
-  // while ((bytes = recv(clientSocket, buffer + bufferSize, sizeof(buffer) - bufferSize, 0)) == -1);
-
-
-
-  // bufferSize += bytes;
-
-
-
-loop:
-
-  ssize_t bytes = recv(clientSocket, buffer, chunk_size, 0);
-
-  bool eof = false; 
-
-  for (ssize_t i = 0; i < bytes; i++) // find end of header
+  ssize_t bytes;
+  while ((bytes = recv(clientSocket, buffer + bufferSize, chunk_size, 0)) != -1) // buffer overflow
   {
 
-    if (buffer[i] == 'l' && i - 3 >= 0)
-    {
+    if (isEOF(buffer, bufferSize, bytes)) break;
 
-      eof = !strncmp(&buffer[i] - 3, "hell", 4); 
-
-    }
+    bufferSize += bytes;
 
   }
 
-  if (!eof) goto loop;
-  
-  std::cout.write(buffer, bytes);
+  std::cout.write(buffer, bufferSize + bytes);
    
   std::string html = "<form method='post'><label for='a'>TEXT:</label><input type='text' id='a' name='input' required><<button type='submit'>SEND</button></form>";
   std::string http = std::string("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ") + std::to_string(html.size()) + "\r\n\r\n" + html;
