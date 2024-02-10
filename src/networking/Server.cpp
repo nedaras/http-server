@@ -77,7 +77,7 @@ int Server::listen(const char* port)
   int clientSocket = accept(m_listenSocket, nullptr, nullptr);
 
   char buffer[8 * 1024];
-  size_t chunk_size = 1024;
+  size_t chunk_size = 2;
   size_t bufferSize = 0;
 
   timeval timeout;
@@ -102,14 +102,11 @@ int Server::listen(const char* port)
 
     }
 
-    parser.parse(bytes);
-
-    // handlebytes == 0, connection closed
-    bool eof = isEOF(buffer, bufferSize, (size_t)bytes); // parse http insame time
+    bool parsed = parser.parse(bytes) == 0;
 
     bufferSize += bytes;
 
-    if (eof) break;
+    if (parsed) break;
 
   }
 
@@ -117,7 +114,14 @@ int Server::listen(const char* port)
   std::cout << "method: (" << parser.method << ")\n"; 
   std::cout << "path: (" << parser.path << ")\n"; 
 
-  std::string html = "<form method='post'><label for='a'>TEXT:</label><input type='text' id='a' name='input' required><<button type='submit'>SEND</button></form>";
+  for (auto header : parser.headers)
+  {
+
+    std::cout << "header: (" << header.key << ") (" << header.value << ")\n";
+
+  }
+
+  std::string html = "<form method='post'><label for='a'>TEXT:</label><input type='text' id='a' name='input' required><button type='submit'>SEND</button></form>";
   std::string http = std::string("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ") + std::to_string(html.size()) + "\r\n\r\n" + html;
 
   send(clientSocket, http.c_str(), http.size(), 0);  
