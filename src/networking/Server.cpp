@@ -1,5 +1,7 @@
 #include "Server.h"
 
+#include <asm-generic/socket.h>
+#include <bits/types/struct_timeval.h>
 #include <cstddef>
 #include <cstring>
 #include <sys/types.h>
@@ -8,6 +10,7 @@
 #include <sys/socket.h>
 #include <iostream>
 #include <string>
+#include "../http/parser.h"
 
 static bool isEOF(const char* buffer, size_t bufferLength, size_t bytesRead)
 {
@@ -77,18 +80,43 @@ int Server::listen(const char* port)
   size_t chunk_size = 1024;
   size_t bufferSize = 0;
 
-  ssize_t bytes;
-  while ((bytes = recv(clientSocket, buffer + bufferSize, chunk_size, 0)) != -1) // buffer overflow
+  timeval timeout;
+
+  timeout.tv_sec = 5;
+  timeout.tv_usec = 0;
+  
+  setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+  http::Parser parser(buffer);
+
+  while (sizeof(buffer) > bufferSize + chunk_size)
   {
 
-    if (isEOF(buffer, bufferSize, bytes)) break;
+    ssize_t bytes = recv(clientSocket, buffer + bufferSize, chunk_size, 0);
+
+    if (bytes == -1)
+    {
+
+      std::cout << "timeout\n";
+      return 1;
+
+    }
+
+    parser.parse(bytes);
+
+    // handlebytes == 0, connection closed
+    bool eof = isEOF(buffer, bufferSize, (size_t)bytes); // parse http insame time
 
     bufferSize += bytes;
 
+    if (eof) break;
+
   }
 
-  std::cout.write(buffer, bufferSize + bytes);
-   
+  std::cout.write(buffer, bufferSize);
+  std::cout << "method: (" << parser.method << ")\n"; 
+  std::cout << "path: (" << parser.path << ")\n"; 
+
   std::string html = "<form method='post'><label for='a'>TEXT:</label><input type='text' id='a' name='input' required><<button type='submit'>SEND</button></form>";
   std::string http = std::string("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ") + std::to_string(html.size()) + "\r\n\r\n" + html;
 
