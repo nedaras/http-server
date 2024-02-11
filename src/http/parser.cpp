@@ -1,21 +1,8 @@
 #include "parser.h"
-#include <iostream>
-#include <string_view>
 
 // yes this code is the worst and can be exploted so simply
-
-static std::string_view token(char*& buffer, char token)
-{
-
-  char* start = buffer;
-
-  while (*buffer++ != token);
-  
-  return std::string_view(start, buffer - start - 1); 
-
-}
-
-int http::Parser::parse(size_t bytes)
+// TODO: make return values an error return values
+int http::Parser::parse(size_t bytes) // add some token chars arays
 {
 
   char* end = &m_buffer[bytes];
@@ -23,40 +10,79 @@ int http::Parser::parse(size_t bytes)
   while (m_buffer != end)
   {
 
-    size_t length = m_buffer - m_unhandledBuffer;
-
-    std::cout << *m_buffer;
-
     switch (m_state)
     {
     case REQUEST_METHOD:
-
       if (*m_buffer != ' ') break;
-
-      method = std::string_view(m_unhandledBuffer, length);
+      method = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
       m_state = REQUEST_PATH_BEGIN;
-
       break;
     case REQUEST_PATH_BEGIN:
-
       if (*m_buffer == ' ') break;
-
       m_state = REQUEST_PATH;
       m_unhandledBuffer = m_buffer;
-
       break;
     case REQUEST_PATH:
-
       if (*m_buffer != ' ') break;
-
-      path = std::string_view(m_unhandledBuffer, length);
+      path = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
       m_state = REQUEST_H;
-      
       break;
-    default:
-
-      if (*m_buffer == '\n') return 0;
-
+    case REQUEST_H:
+      if (*m_buffer != 'H') return -1;
+      m_state = REQUEST_HT;
+      break;
+    case REQUEST_HT: 
+      if (*m_buffer != 'T') return -1;
+      m_state = REQUEST_HTT;
+      break;
+    case REQUEST_HTT: 
+      if (*m_buffer != 'T') return -1;
+      m_state = REQUEST_HTTP;
+      break;
+    case REQUEST_HTTP:
+      if (*m_buffer != 'P') return -1;
+      m_state = REQUEST_HTTP_DASH; 
+      break;
+    case REQUEST_HTTP_DASH:
+      if (*m_buffer != '/') return -1;
+      m_state = REQUEST_HTTP_MINOR; 
+      break;
+    case REQUEST_HTTP_MINOR:
+      if (*m_buffer != '1') return -1;
+      m_state = REQUEST_HTTP_DOT; 
+      break;
+    case REQUEST_HTTP_DOT:
+      if (*m_buffer != '.') return -1;
+      m_state = REQUEST_HTTP_MAJOR; 
+      break;
+    case REQUEST_HTTP_MAJOR:
+      if (*m_buffer != '1') return -1;
+      m_state = REQUEST_HTTP_END; 
+      break;
+    case REQUEST_HTTP_END:
+      if (*m_buffer == '\n' && *(m_buffer - 1) == '\r') m_state = REQUEST_HEADER_KEY_BEGIN;
+      break;
+    case REQUEST_HEADER_KEY_BEGIN:
+      if (*m_buffer == '\r') return 0; // ye we need to check if \r\n nor just \r
+      m_state = REQUEST_HEADER_KEY;
+      m_unhandledBuffer = m_buffer;
+      break;
+    case REQUEST_HEADER_KEY:
+      if (*m_buffer != ':') break;
+      m_header.key = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
+      m_state = REQUEST_HEADER_VALUE_BEGIN;
+      break;
+    case REQUEST_HEADER_VALUE_BEGIN:
+      if (*m_buffer == ' ') break;
+      m_state = REQUEST_HEADER_VALUE;
+      m_unhandledBuffer = m_buffer;
+      break;
+    case REQUEST_HEADER_VALUE:
+      if (*m_buffer != '\n') break;
+      if (*(m_buffer - 1) != '\r') break;
+      m_header.value = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer - 1);
+      headers.push_back(m_header);
+      m_state = REQUEST_HEADER_KEY_BEGIN; 
       break;
     }
   
@@ -65,34 +91,5 @@ int http::Parser::parse(size_t bytes)
   }
 
   return 1;
-
-  method = token(m_buffer, ' ');
-  path = token(m_buffer, ' ');
-
-  if (*m_buffer++ != 'H') return 1;
-  if (*m_buffer++ != 'T') return 1;
-  if (*m_buffer++ != 'T') return 1;
-  if (*m_buffer++ != 'P') return 1;
-  if (*m_buffer++ != '/') return 1;
-  if (*m_buffer++ != '1') return 1;
-  if (*m_buffer++ != '.') return 1;
-  if (*m_buffer++ != '1') return 1;
-  if (*m_buffer++ != '\r') return 1;
-  if (*m_buffer++ != '\n') return 1;
-  
-  while (true)
-  {
-
-    if (*m_buffer == '\r') break;
-
-    std::string_view key = token(m_buffer, ':');
-    m_buffer++;
-    std::string_view value = token(m_buffer, '\n');
-
-    headers.push_back({ key, std::string_view(value.data(), value.size() - 1) });
-
-  }
-
-  return 0;
 
 }

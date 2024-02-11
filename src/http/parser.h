@@ -45,12 +45,18 @@ private:
     REQUEST_HTTP_DASH,
     REQUEST_HTTP_MINOR,
     REQUEST_HTTP_DOT,
-    REQUEST_HTTP_MAJOR
+    REQUEST_HTTP_MAJOR,
+    REQUEST_HTTP_END,
+    REQUEST_HEADER_KEY_BEGIN,
+    REQUEST_HEADER_KEY,
+    REQUEST_HEADER_VALUE_BEGIN, 
+    REQUEST_HEADER_VALUE,
   };
 
   char* m_buffer;
   char* m_unhandledBuffer;
-
+  
+  Header m_header;
   STATE m_state = REQUEST_METHOD;
 
 };

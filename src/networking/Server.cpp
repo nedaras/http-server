@@ -1,10 +1,6 @@
 #include "Server.h"
 
-#include <asm-generic/socket.h>
-#include <bits/types/struct_timeval.h>
-#include <cstddef>
 #include <cstring>
-#include <sys/types.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -77,7 +73,7 @@ int Server::listen(const char* port)
   int clientSocket = accept(m_listenSocket, nullptr, nullptr);
 
   char buffer[8 * 1024];
-  size_t chunk_size = 2;
+  size_t chunk_size = 1024;
   size_t bufferSize = 0;
 
   timeval timeout;
