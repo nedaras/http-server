@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 #include <iostream>
 #include <string>
-#include "../http/parser.h"
+#include "./Request.h"
 
 static bool isEOF(const char* buffer, size_t bufferLength, size_t bytesRead)
 {
@@ -73,7 +73,7 @@ int Server::listen(const char* port)
   int clientSocket = accept(m_listenSocket, nullptr, nullptr);
 
   char buffer[8 * 1024];
-  size_t chunk_size = 1024;
+  size_t chunk_size = 1; 
   size_t bufferSize = 0;
 
   timeval timeout;
@@ -83,34 +83,12 @@ int Server::listen(const char* port)
   
   setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
-  http::Parser parser(buffer);
+  Request request(clientSocket);
 
-  while (sizeof(buffer) > bufferSize + chunk_size)
-  {
+  std::cout << "method: (" << request.method << ")\n"; 
+  std::cout << "path: (" << request.path << ")\n"; 
 
-    ssize_t bytes = recv(clientSocket, buffer + bufferSize, chunk_size, 0);
-
-    if (bytes == -1)
-    {
-
-      std::cout << "timeout\n";
-      return 1;
-
-    }
-
-    bool parsed = parser.parse(bytes) == 0;
-
-    bufferSize += bytes;
-
-    if (parsed) break;
-
-  }
-
-  std::cout.write(buffer, bufferSize);
-  std::cout << "method: (" << parser.method << ")\n"; 
-  std::cout << "path: (" << parser.path << ")\n"; 
-
-  for (auto header : parser.headers)
+  for (auto header : request.headers)
   {
 
     std::cout << "header: (" << header.key << ") (" << header.value << ")\n";

@@ -2,11 +2,13 @@
 
 // yes this code is the worst and can be exploted so simply
 // TODO: make return values an error return values
-int http::Parser::parse(size_t bytes) // add some token chars arays
+// TODO: make some standards like what chars can be used idk utf-8 if im not bored
+// chunked encoding to
+int http::Parser::parse(std::size_t bytes) // add some token chars arays
 {
 
   char* end = &m_buffer[bytes];
-  
+ 
   while (m_buffer != end)
   {
 
@@ -57,13 +59,22 @@ int http::Parser::parse(size_t bytes) // add some token chars arays
       break;
     case REQUEST_HTTP_MAJOR:
       if (*m_buffer != '1') return -1;
-      m_state = REQUEST_HTTP_END; 
+      m_state = REQUEST_HTTP_ALMOST_END; 
+      break;
+    case REQUEST_HTTP_ALMOST_END:
+      if (*m_buffer != '\r') return -1;
+      m_state = REQUEST_HTTP_END;
       break;
     case REQUEST_HTTP_END:
-      if (*m_buffer == '\n' && *(m_buffer - 1) == '\r') m_state = REQUEST_HEADER_KEY_BEGIN;
+      if (*m_buffer != '\n') return -1;
+      m_state = REQUEST_HEADER_KEY_BEGIN;
       break;
     case REQUEST_HEADER_KEY_BEGIN:
-      if (*m_buffer == '\r') return 0; // ye we need to check if \r\n nor just \r
+      if (*m_buffer == '\r')
+      {
+        m_state = REQUEST_EOF;
+        break;
+      }
       m_state = REQUEST_HEADER_KEY;
       m_unhandledBuffer = m_buffer;
       break;
@@ -83,6 +94,11 @@ int http::Parser::parse(size_t bytes) // add some token chars arays
       m_header.value = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer - 1);
       headers.push_back(m_header);
       m_state = REQUEST_HEADER_KEY_BEGIN; 
+      break;
+    case REQUEST_EOF:
+      if (*m_buffer == '\n') return 0; // it prob should just throw error 
+      m_state = REQUEST_HEADER_KEY;
+      m_unhandledBuffer = m_buffer - 1;
       break;
     }
   
