@@ -10,7 +10,7 @@ Request::Request(int socket)
   while (m_bufferSize > m_bufferLength + m_chunkSize)
   {
 
-    ssize_t bytesRead = recv(socket, m_buffer.get(), m_chunkSize, 0);
+    ssize_t bytesRead = recv(socket, m_buffer.get() + m_bufferLength, m_chunkSize, 0);
   
     if (bytesRead == -1)
     {
@@ -24,7 +24,7 @@ Request::Request(int socket)
       
     m_bufferLength += bytesRead;    
     
-    if (parser.parse(bytesRead) == 0) break; // include like dead state
+    if (parser.parse(bytesRead) == 0) break; // include like dead state, btw handle errors
 
   }
 
