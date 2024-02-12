@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <vector>
 #include "../http/parser.h"
@@ -12,14 +13,16 @@ public:
 
   Request(int socket);
 
+  std::optional<std::string_view> GetHeader(std::string_view header) const;
+
 public:
 
   std::string_view method;
   std::string_view path;
 
-  std::vector<http::Header> headers;
-
 private:
+
+  std::vector<http::Header> m_headers;
 
   constexpr static std::size_t m_bufferSize = 8 * 1024;
   constexpr static std::size_t m_chunkSize = 1024;

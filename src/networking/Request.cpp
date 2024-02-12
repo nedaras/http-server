@@ -31,7 +31,20 @@ Request::Request(int socket)
   method = parser.method;
   path = parser.path;
 
-  headers = std::move(parser.headers);
+  m_headers = std::move(parser.headers);
 
 }
 
+std::optional<std::string_view> Request::GetHeader(std::string_view header) const
+{
+  
+  for (auto& [ key, value ] : m_headers)
+  {
+
+    if (key == header) return value;
+
+  }
+  
+  return {};
+
+}

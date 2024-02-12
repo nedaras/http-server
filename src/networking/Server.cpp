@@ -72,10 +72,6 @@ int Server::listen(const char* port)
 
   int clientSocket = accept(m_listenSocket, nullptr, nullptr);
 
-  char buffer[8 * 1024];
-  size_t chunk_size = 1; 
-  size_t bufferSize = 0;
-
   timeval timeout;
 
   timeout.tv_sec = 5;
@@ -85,16 +81,8 @@ int Server::listen(const char* port)
 
   Request request(clientSocket);
 
-  std::cout << "method: (" << request.method << ")\n"; 
-  std::cout << "path: (" << request.path << ")\n"; 
-
-  for (auto header : request.headers)
-  {
-
-    std::cout << "header: (" << header.key << ") (" << header.value << ")\n";
-
-  }
-
+  m_callback(request);  
+  
   std::string html = "<form method='post'><label for='a'>TEXT:</label><input type='text' id='a' name='input' required><button type='submit'>SEND</button></form>";
   std::string http = std::string("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ") + std::to_string(html.size()) + "\r\n\r\n" + html;
 
