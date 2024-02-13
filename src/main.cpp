@@ -9,15 +9,17 @@ void Handler(const Request& request, const Response& response)
     std::cout << "Err in request\n";
   }
 
-
   std::cout << request.getHeader("Connection").value_or("Header not found") << "\n";
 
-  std::string html = "<!DOCTYPE html><html><head></head><body><h1>hello world</h1></body></html>";
-
   response.writeHead("Content-Type", "text/html");
-  response.writeHead("Content-Length", std::to_string(html.size()));
+  //response.writeHead("Content-Length", std::to_string(html.size()));
+  response.writeHead("Transfer-Encoding", "chunked");
 
-  response.write(html);
+  response.write("<!DOCTYPE html><html><head></head><body><h1>hello world</h1>");
+  response.write("<h2>this is a chunk</h2>");
+  response.write("</body></html>");
+
+  response.end(); // not if keep alive, but we should add some like timeout function
 
 }
 

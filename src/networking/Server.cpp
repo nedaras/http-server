@@ -1,32 +1,10 @@
 #include "Server.h"
 
-#include <cstring>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
-#include <iostream>
-#include <string>
 #include "./Request.h"
 #include "Response.h"
-
-static bool isEOF(const char* buffer, size_t bufferLength, size_t bytesRead)
-{
-
-  for (ssize_t i = bufferLength; i < bufferLength + bytesRead; i++) // find end of header
-  {
-
-    if (buffer[i] == '\n' && i - 3 >= 0)
-    {
-
-      if(std::strncmp(&buffer[i] - 3, "\r\n\r\n", 4) == 0) return 1;
-
-    }
-
-  }
-  
-  return 0;
-
-}
 
 int Server::listen(const char* port)
 {
@@ -83,12 +61,17 @@ int Server::listen(const char* port)
     setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     Request request(clientSocket);
-
+    
+    if (request == REQUEST_CLOSE)
+    {
+      close(clientSocket);
+      continue;
+    }
 
     Response response(clientSocket);
-    m_callback(request, response);
-
-    close(clientSocket); 
+    m_callback(request, response); // we need to handle chunk data like idk in request add reader with callback
+    
+    // handle keep alive if response was so
 
   }
 

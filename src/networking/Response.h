@@ -13,6 +13,10 @@ public:
 
   void write(std::string_view buffer) const;
 
+  void writeData(std::string_view buffer) const;
+
+  void end() const;
+
 private:
   
   mutable bool m_headSent = false;
