@@ -6,6 +6,13 @@
 #include <vector>
 #include "../http/parser.h"
 
+enum RESPONSE_STATUS : char
+{
+  REQUEST_SUCCESS,
+  REQUEST_TIMEOUT,
+  REQUEST_CLOSE
+};
+
 class Request
 {
 
@@ -13,7 +20,9 @@ public:
 
   Request(int socket);
 
-  std::optional<std::string_view> GetHeader(std::string_view header) const;
+  std::optional<std::string_view> getHeader(std::string_view header) const;
+
+  operator RESPONSE_STATUS() const; 
 
 public:
 
@@ -29,5 +38,7 @@ private:
 
   std::unique_ptr<char[]> m_buffer = std::make_unique<char[]>(m_bufferSize);
   std::size_t m_bufferLength = 0; 
+
+  RESPONSE_STATUS m_status = REQUEST_SUCCESS;
 
 };

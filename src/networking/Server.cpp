@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 #include "./Request.h"
+#include "Response.h"
 
 static bool isEOF(const char* buffer, size_t bufferLength, size_t bytesRead)
 {
@@ -70,25 +71,27 @@ int Server::listen(const char* port)
 
   }
 
-  int clientSocket = accept(m_listenSocket, nullptr, nullptr);
-
   timeval timeout;
 
   timeout.tv_sec = 5;
   timeout.tv_usec = 0;
-  
-  setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
-  Request request(clientSocket);
+  while (true)// single threaded :(, blocking io
+  {
 
-  m_callback(request);  
-  
-  std::string html = "<form method='post'><label for='a'>TEXT:</label><input type='text' id='a' name='input' required><button type='submit'>SEND</button></form>";
-  std::string http = std::string("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ") + std::to_string(html.size()) + "\r\n\r\n" + html;
+    int clientSocket = accept(m_listenSocket, nullptr, nullptr);
+    setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
-  send(clientSocket, http.c_str(), http.size(), 0);  
-  
-  close(clientSocket); 
+    Request request(clientSocket);
+
+
+    Response response(clientSocket);
+    m_callback(request, response);
+
+    close(clientSocket); 
+
+  }
+
   close(m_listenSocket);
 
   return 0; 

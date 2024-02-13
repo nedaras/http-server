@@ -14,12 +14,14 @@ Request::Request(int socket)
   
     if (bytesRead == -1)
     {
-      //err
+      m_status = REQUEST_TIMEOUT;
+      return;
     }
 
     if (bytesRead == 0)
     {
-      //close
+      m_status = REQUEST_CLOSE; 
+      return;
     }
       
     m_bufferLength += bytesRead;    
@@ -35,7 +37,7 @@ Request::Request(int socket)
 
 }
 
-std::optional<std::string_view> Request::GetHeader(std::string_view header) const
+std::optional<std::string_view> Request::getHeader(std::string_view header) const
 {
   
   for (auto& [ key, value ] : m_headers)
@@ -46,5 +48,12 @@ std::optional<std::string_view> Request::GetHeader(std::string_view header) cons
   }
   
   return {};
+
+}
+
+Request::operator RESPONSE_STATUS() const
+{
+  
+  return m_status;
 
 }
