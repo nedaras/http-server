@@ -1,13 +1,9 @@
 #include "networking/Server.h"
 #include <iostream>
+#include <sys/socket.h>
 
 void Handler(const Request& request, const Response& response)
 {
-
-  if (request != REQUEST_SUCCESS)
-  {
-    std::cout << "Err in request\n";
-  }
 
   std::cout << request.getHeader("Connection").value_or("Header not found") << "\n";
 
@@ -19,7 +15,11 @@ void Handler(const Request& request, const Response& response)
   response.write("<h2>this is a chunk</h2>");
   response.write("</body></html>");
 
-  response.end(); // not if keep alive, but we should add some like timeout function
+  // just for now
+  send(request.getSocket(), "0\r\n\r\n", 5, 0);
+
+  //for now we closing automaticly
+  //response.end(); // not if keep alive, but we should add some like timeout function
 
 }
 

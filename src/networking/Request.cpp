@@ -20,13 +20,13 @@ int Request::parse()
   if (bytesRead == -1)
   {
     m_status = REQUEST_TIMEOUT;
-    return 1;
+    return -1;
   }
 
   if (bytesRead == 0)
   {
     m_status = REQUEST_CLOSE; 
-    return 1;
+    return -1;
   }
 
   m_bufferLength += bytesRead;    
@@ -48,12 +48,3 @@ std::optional<std::string_view> Request::getHeader(std::string_view header) cons
   return {};
 
 }
-
-Request::operator RESPONSE_STATUS() const
-{
-  
-  return m_status;
-
-}
-
-

@@ -1,5 +1,6 @@
 #include "Server.h"
 
+#include <cerrno>
 #include <iostream>
 #include <unistd.h>
 #include <netdb.h>
@@ -7,8 +8,14 @@
 #include <sys/epoll.h>
 #include "./Request.h"
 #include "Response.h"
-#include <unordered_map>
 #include <vector>
+
+// TODO: better api,
+// TODO: handle errors
+// TODO: strict http parser
+// TODO: threadpoll
+// TODO: chunked data handling
+// TODO: profit
 
 int Server::listen(const char* port)
 {
@@ -53,87 +60,107 @@ int Server::listen(const char* port)
 
   }
 
-  timeval timeout;
+  int epoll = epoll_create1(0);
 
-  timeout.tv_sec = 5;
-  timeout.tv_usec = 0;
-
-  int efd = epoll_create1(0);
-
-  epoll_event ev;
-  
   std::vector<epoll_event> events;
-  std::unordered_map<int, Request> requests;
-
-  ev.events = EPOLLIN; // brainstorm ev.data can store 8 bytes why not to store like to a request objects pointer
-  ev.data.fd = m_listenSocket;
   
-  epoll_ctl(efd, EPOLL_CTL_ADD, m_listenSocket, &ev);
+  {
 
-  events.push_back({});
+    epoll_event event;
+
+    event.events = EPOLLIN;
+    event.data.ptr = &m_listenSocket;
+
+    epoll_ctl(epoll, EPOLL_CTL_ADD, m_listenSocket, &event);
+
+    events.push_back({});
   
+  }
+  // where in the fuck is error handling hu? 
   while (true)
   {
-    int nfds = epoll_wait(efd, events.data(), events.size(), -1);
 
-    for (int i = 0; i < nfds; i++)
+    int epolls = epoll_wait(epoll, events.data(), events.size(), -1);
+
+    for (int i = 0; i < epolls; i++)
     {
-
-      if (events[i].events & EPOLLIN)
+      
+      if (!(events[i].events & EPOLLIN)) continue;
+      if (events[i].data.ptr == &m_listenSocket)
       {
 
-        if (events[i].data.fd == m_listenSocket)
-        {
+        int clientSocket = accept(m_listenSocket, nullptr, nullptr);
+        Request* request = new Request(clientSocket); // idk request will always be allocated so mby make that char buffer part of
+                                                      // why do 2 allocations
+        
+        epoll_event event;
 
-          int fd_new = accept(m_listenSocket, nullptr, nullptr);
-      
-          ev.events = EPOLLIN;
-          ev.data.fd = fd_new;
-          
-          events.push_back({});
-          epoll_ctl(efd, EPOLL_CTL_ADD, fd_new, &ev);
+        event.events = EPOLLIN;
+        event.data.ptr = request;
 
-        }
-        else
-        {
-            
-          if (requests.find(events[i].data.fd) == requests.end())
-          {
-            
-            Request request(events[i].data.fd);
-            requests[events[i].data.fd] = std::move(request);
+        epoll_ctl(epoll, EPOLL_CTL_ADD, clientSocket, &event);
 
-          }
+        events.push_back({});
 
-          Request request = requests.at(events[i].data.fd);
-          
-          int r = request.parse(); 
+        continue;
 
-          if (r == 0)
-          {
-
-            Response response(events[i].data.fd);
-
-            m_callback(request, response);
-
-            ev.events = EPOLLET;
-            ev.data.fd = events[i].data.fd;
-
-            events.pop_back();
-            requests.erase(events[i].data.fd);
-
-            epoll_ctl(efd, EPOLL_CTL_DEL, events[i].data.fd, &ev);
-            close(events[i].data.fd);
-            
-            
-
-          }
-        }
       }
+
+      Request* request = static_cast<Request*>(events[i].data.ptr);
+
+      int result = request->parse();
+      
+      if (result == -1)
+      {
+
+        epoll_event event;
+
+        event.events = EPOLLET;
+        event.data.ptr = nullptr;
+        
+        epoll_ctl(epoll, EPOLL_CTL_DEL, request->getSocket(), &event);
+        close(request->getSocket());
+        
+        events.pop_back();
+        delete request;
+
+        continue;
+      }
+
+      if (result == 0) // throw this in thread pool and think how should we handle chunked encoding and stuff jeez
+      {
+
+        Response response(request->getSocket());
+        
+        m_callback(*request, response);
+
+        epoll_event event;
+
+        event.events = EPOLLET;
+        event.data.ptr = nullptr;
+
+        epoll_ctl(epoll, EPOLL_CTL_DEL, request->getSocket(), &event); // cant pass closed socket,
+                                                                       // btw we need state to handle keep alive
+        close(request->getSocket());
+
+        events.pop_back();
+        delete request;
+
+      }
+
     }
+
   }
-  // remove listensocket from epoll
+
+  epoll_event event;
+  
+  event.events = EPOLLET;
+  event.data.ptr = nullptr;
+
+  epoll_ctl(epoll, EPOLL_CTL_DEL, m_listenSocket, &event);
+
   close(m_listenSocket);
+  close(epoll); 
 
   return 0; 
 

@@ -20,25 +20,27 @@ class Request
 public:
 
   Request(int socket);
-  Request() {};
 
   std::optional<std::string_view> getHeader(std::string_view header) const;
+  
+  int constexpr getSocket() const
+  {
+    return m_socket;
+  }
 
   int parse();
-
-  operator RESPONSE_STATUS() const; 
 
 public:
 
 private:
 
   int m_socket;
-  http::Parser m_parser;
+  http::Parser m_parser;// i dont like to refrence it 
   
   constexpr static std::size_t m_bufferSize = 8 * 1024;
   constexpr static std::size_t m_chunkSize = 1024;
 
-  std::shared_ptr<char[]> m_buffer = std::make_unique<char[]>(m_bufferSize);
+  std::unique_ptr<char[]> m_buffer = std::make_unique<char[]>(m_bufferSize); // this has to be unique, aka deleted at class destructor
   std::size_t m_bufferLength = 0; 
 
   RESPONSE_STATUS m_status = REQUEST_SUCCESS;
