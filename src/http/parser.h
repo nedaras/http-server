@@ -23,6 +23,7 @@ class Parser
 public:
 
   Parser(char* buffer) : m_buffer(buffer), m_unhandledBuffer(buffer) {};
+  Parser() : m_buffer(nullptr), m_unhandledBuffer(nullptr) {};
 
   int parse(std::size_t bytes);
 

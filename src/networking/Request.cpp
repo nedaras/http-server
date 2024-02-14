@@ -5,42 +5,40 @@
 Request::Request(int socket)
 {
 
-  http::Parser parser(m_buffer.get());
+  m_socket = socket;
+  m_parser = http::Parser(m_buffer.get());
 
-  while (m_bufferSize > m_bufferLength + m_chunkSize)
+}
+
+int Request::parse()
+{
+
+  if (m_bufferLength + m_chunkSize > m_bufferSize) return -1;
+
+  ssize_t bytesRead = recv(m_socket, m_buffer.get() + m_bufferLength, m_chunkSize, 0);
+            
+  if (bytesRead == -1)
   {
-
-    ssize_t bytesRead = recv(socket, m_buffer.get() + m_bufferLength, m_chunkSize, 0);
-  
-    if (bytesRead == -1)
-    {
-      m_status = REQUEST_TIMEOUT;
-      return;
-    }
-
-    if (bytesRead == 0)
-    {
-      m_status = REQUEST_CLOSE; 
-      return;
-    }
-      
-    m_bufferLength += bytesRead;    
-    
-    if (parser.parse(bytesRead) == 0) break; // include like dead state, btw handle errors
-
+    m_status = REQUEST_TIMEOUT;
+    return 1;
   }
 
-  method = parser.method;
-  path = parser.path;
+  if (bytesRead == 0)
+  {
+    m_status = REQUEST_CLOSE; 
+    return 1;
+  }
 
-  m_headers = std::move(parser.headers);
+  m_bufferLength += bytesRead;    
+  
+  return m_parser.parse(bytesRead);
 
 }
 
 std::optional<std::string_view> Request::getHeader(std::string_view header) const
 {
   
-  for (auto& [ key, value ] : m_headers)
+  for (auto& [ key, value ] : m_parser.headers)
   {
 
     if (key == header) return value;
@@ -57,3 +55,5 @@ Request::operator RESPONSE_STATUS() const
   return m_status;
 
 }
+
+

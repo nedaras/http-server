@@ -7,6 +7,7 @@
 #include <sys/epoll.h>
 #include "./Request.h"
 #include "Response.h"
+#include <unordered_map>
 #include <vector>
 
 int Server::listen(const char* port)
@@ -62,18 +63,18 @@ int Server::listen(const char* port)
   epoll_event ev;
   
   std::vector<epoll_event> events;
+  std::unordered_map<int, Request> requests;
 
   ev.events = EPOLLIN; // brainstorm ev.data can store 8 bytes why not to store like to a request objects pointer
   ev.data.fd = m_listenSocket;
   
   epoll_ctl(efd, EPOLL_CTL_ADD, m_listenSocket, &ev);
-  events.push_back({});
 
-  while (true)// single threaded :(, blocking io
+  events.push_back({});
+  
+  while (true)
   {
     int nfds = epoll_wait(efd, events.data(), events.size(), -1);
-
-    std::cout << events.size() << "\n";
 
     for (int i = 0; i < nfds; i++)
     {
@@ -83,8 +84,6 @@ int Server::listen(const char* port)
 
         if (events[i].data.fd == m_listenSocket)
         {
-          
-          std::cout << "new con\n";
 
           int fd_new = accept(m_listenSocket, nullptr, nullptr);
       
@@ -97,54 +96,41 @@ int Server::listen(const char* port)
         }
         else
         {
+            
+          if (requests.find(events[i].data.fd) == requests.end())
+          {
+            
+            Request request(events[i].data.fd);
+            requests[events[i].data.fd] = std::move(request);
 
-          char buffer[1024];
-          ssize_t bytes = recv(events[i].data.fd, buffer, 1024, 0);
+          }
 
-          if (bytes == 0) 
+          Request request = requests.at(events[i].data.fd);
+          
+          int r = request.parse(); 
+
+          if (r == 0)
           {
 
-            std::cout << "con closed\n";
-            
+            Response response(events[i].data.fd);
+
+            m_callback(request, response);
+
             ev.events = EPOLLET;
             ev.data.fd = events[i].data.fd;
 
             events.pop_back();
+            requests.erase(events[i].data.fd);
+
             epoll_ctl(efd, EPOLL_CTL_DEL, events[i].data.fd, &ev);
             close(events[i].data.fd);
+            
+            
 
-            continue;
           }
-          std::cout << "new data\n";
-          std::cout.write(buffer, bytes);
-  
-          send(events[i].data.fd, "Sup!", 4, 0);
-
         }
       }
     }
-
-    continue;
-
-    int clientSocket = accept(m_listenSocket, nullptr, nullptr);
-    setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));// dont depend on timeouts make it non blocking io with select
-
-    // how to implememt epoll, how to track buffers efficent and in async way
-    // if send blocks we need to make it non blocking too, but then how to send packets in correct order 
-
-    Request request(clientSocket);
-       
-    if (request == REQUEST_CLOSE)
-    {
-      close(clientSocket);
-      continue;
-    }
-
-    Response response(clientSocket);
-    m_callback(request, response); // we need to handle chunk data like idk in request add reader with callback
-    
-    // handle keep alive if response was so
-
   }
   // remove listensocket from epoll
   close(m_listenSocket);

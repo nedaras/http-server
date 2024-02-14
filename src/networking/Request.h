@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -19,24 +20,25 @@ class Request
 public:
 
   Request(int socket);
+  Request() {};
 
   std::optional<std::string_view> getHeader(std::string_view header) const;
+
+  int parse();
 
   operator RESPONSE_STATUS() const; 
 
 public:
 
-  std::string_view method;
-  std::string_view path;
-
 private:
 
-  std::vector<http::Header> m_headers;
-
+  int m_socket;
+  http::Parser m_parser;
+  
   constexpr static std::size_t m_bufferSize = 8 * 1024;
   constexpr static std::size_t m_chunkSize = 1024;
 
-  std::unique_ptr<char[]> m_buffer = std::make_unique<char[]>(m_bufferSize);
+  std::shared_ptr<char[]> m_buffer = std::make_unique<char[]>(m_bufferSize);
   std::size_t m_bufferLength = 0; 
 
   RESPONSE_STATUS m_status = REQUEST_SUCCESS;
