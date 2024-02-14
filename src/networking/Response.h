@@ -18,8 +18,10 @@ public:
   void end() const;
 
 private:
-  
+  // make it one bit 
   mutable bool m_headSent = false;
+  mutable bool m_chunkSent = false;
+
   int m_socket;
 
 };

@@ -58,7 +58,9 @@ int Server::listen(const char* port)
   {
 
     int clientSocket = accept(m_listenSocket, nullptr, nullptr);
-    setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));// dont depend on timeouts make it non blocking io with select
+                                                                                 // and mby add multithreading for handling a request mby, mby
+                                                                                 // user should make multithreading itself idk
 
     Request request(clientSocket);
     
