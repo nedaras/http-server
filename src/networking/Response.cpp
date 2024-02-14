@@ -1,6 +1,5 @@
 #include "Response.h"
 #include <cstddef>
-#include <string>
 #include <sys/socket.h>
 #include <unistd.h>
 
