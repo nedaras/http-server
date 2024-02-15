@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -56,6 +55,7 @@ private:
     REQUEST_HEADER_KEY,
     REQUEST_HEADER_VALUE_BEGIN, 
     REQUEST_HEADER_VALUE,
+    REQUEST_HEADER_END,
     REQUEST_EOF
   };
 

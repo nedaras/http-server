@@ -1,19 +1,30 @@
 #include "parser.h"
-#include <cstdint>
-// yes this code is the worst and can be exploted so simply
+
 // TODO: make return values an error return values
 // TODO: make some standards like what chars can be used idk utf-8 if im not bored
 // chunked encoding to
 
-constexpr static bool IS_UPPER_ALPHA(char c)
-{
-  return c >= 'A' && c <= 'Z';
-}
+// we need to bench mark these arrays couse making it 256 bytes altough would be bigger i think to acess it would be very fast
+static constexpr const std::uint8_t tokens[32] = { // wait http allows utf-8, thats pizda
+  0 | 0 | 0 | 0 | 0  | 0  | 0  | 0, 
+  0 | 0 | 0 | 0 | 0  | 0  | 0  | 0, 
+  0 | 0 | 0 | 0 | 0  | 0  | 0  | 0,
+  0 | 0 | 0 | 0 | 0  | 0  | 0  | 0,
+  1 | 2 | 0 | 8 | 16 | 32 | 64 | 128,
+  0 | 0 | 4 | 8 | 0  | 32 | 64 | 0,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 0 | 0 | 0  | 0  | 0  | 0,
+  0 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 0 | 0  | 0  | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 0 | 16 | 0  | 64 | 0,
+}; 
 
-// make url array
-// make toekn array
-
-static std::uint8_t url_tokens[32] = {
+static constexpr const std::uint8_t url_tokens[32] = {
   0 | 0 | 0 | 0 | 0  | 0  | 0  | 0, 
   0 | 0 | 0 | 0 | 0  | 0  | 0  | 0, 
   0 | 0 | 0 | 0 | 0  | 0  | 0  | 0,
@@ -32,16 +43,34 @@ static std::uint8_t url_tokens[32] = {
   1 | 2 | 4 | 8 | 16 | 32 | 64 | 0,
 };
 
-#define IS_URL_CHAR(c) (!!(url_tokens[static_cast<std::uint8_t>(c) >> 3] & (1 << (static_cast<std::uint8_t>(c) & 7))))
+static constexpr bool IS_UPPER_ALPHA(char c)
+{
+  return c >= 'A' && c <= 'Z';
+}
 
-int http::Parser::parse(std::size_t bytes) // add some token chars arays
+static constexpr bool IS_HEADER_CHAR(char c)
+{
+  return c == 9 || (static_cast<unsigned char>(c) > 31 && c != 127);
+}
+
+static constexpr bool IS_TOKEN(char c)
+{
+  return tokens[static_cast<std::uint8_t>(c) >> 3] & (1 << (static_cast<std::uint8_t>(c) & 7));
+}
+
+static constexpr bool IS_URL_CHAR(char c)
+{
+  return url_tokens[static_cast<std::uint8_t>(c) >> 3] & (1 << (static_cast<std::uint8_t>(c)) & 7);
+}
+
+int http::Parser::parse(std::size_t bytes) // mb build unit tests
 {
 
   char* end = &m_buffer[bytes];
  
   while (m_buffer != end)
   {
-
+  
     switch (m_state)
     {
     case REQUEST_METHOD:
@@ -61,7 +90,7 @@ int http::Parser::parse(std::size_t bytes) // add some token chars arays
     case REQUEST_PATH:
       if (*m_buffer != ' ')
       {
-        if (!IS_URL_CHAR(*m_buffer)) return -1;
+        if (!IS_URL_CHAR(*m_buffer)) return -1;// mb just mb parse url too
         break;
       }
       path = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
@@ -113,31 +142,44 @@ int http::Parser::parse(std::size_t bytes) // add some token chars arays
         m_state = REQUEST_EOF;
         break;
       }
+
+      // check if key char is alpha mb
+      if (!IS_TOKEN(*m_buffer)) return -1;
       m_state = REQUEST_HEADER_KEY;
       m_unhandledBuffer = m_buffer;
       break;
     case REQUEST_HEADER_KEY:
-      if (*m_buffer != ':') break;
+      if (*m_buffer != ':') 
+      {
+        if (!IS_TOKEN(*m_buffer)) return -1; // is token kinda idk idk sucks
+        break; 
+      }
       m_header.key = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
       m_state = REQUEST_HEADER_VALUE_BEGIN;
       break;
     case REQUEST_HEADER_VALUE_BEGIN:
-      if (*m_buffer == ' ') break;
+      if (*m_buffer == ' ') break; // no no no we strict af f white space 
       m_state = REQUEST_HEADER_VALUE;
       m_unhandledBuffer = m_buffer;
       break;
     case REQUEST_HEADER_VALUE:
-      if (*m_buffer != '\n') break;
-      if (*(m_buffer - 1) != '\r') break;
-      m_header.value = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer - 1);
-      headers.push_back(m_header);
-      m_state = REQUEST_HEADER_KEY_BEGIN; 
+      if (*m_buffer == '\r')
+      {
+        m_header.value = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
+        headers.push_back(m_header);
+        m_state = REQUEST_HEADER_END;
+
+        break;
+      }
+      
+      if (!IS_HEADER_CHAR(*m_buffer)) return -1;
+      break;
+    case REQUEST_HEADER_END:
+      if (*m_buffer != '\n') return -1;
+      m_state = REQUEST_HEADER_KEY_BEGIN;
       break;
     case REQUEST_EOF:
-      if (*m_buffer == '\n') return 0; // it prob should just throw error 
-      m_state = REQUEST_HEADER_KEY;
-      m_unhandledBuffer = m_buffer - 1;
-      break;
+      return *m_buffer == '\n' ? 0 : -1;
     }
   
     m_buffer++;

@@ -19,7 +19,7 @@ int Request::parse()
             
   if (bytesRead == -1)
   {
-    m_status = REQUEST_TIMEOUT; // req timeout is bullshit
+    m_status = REQUEST_TIMEOUT;
     return -1;
   }
 
