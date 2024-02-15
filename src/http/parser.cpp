@@ -1,9 +1,39 @@
 #include "parser.h"
-
+#include <cstdint>
 // yes this code is the worst and can be exploted so simply
 // TODO: make return values an error return values
 // TODO: make some standards like what chars can be used idk utf-8 if im not bored
 // chunked encoding to
+
+constexpr static bool IS_UPPER_ALPHA(char c)
+{
+  return c >= 'A' && c <= 'Z';
+}
+
+// make url array
+// make toekn array
+
+static std::uint8_t url_tokens[32] = {
+  0 | 0 | 0 | 0 | 0  | 0  | 0  | 0, 
+  0 | 0 | 0 | 0 | 0  | 0  | 0  | 0, 
+  0 | 0 | 0 | 0 | 0  | 0  | 0  | 0,
+  0 | 0 | 0 | 0 | 0  | 0  | 0  | 0,
+  0 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 128,
+  1 | 2 | 4 | 8 | 16 | 32 | 64 | 0,
+};
+
+#define IS_URL_CHAR(c) (!!(url_tokens[static_cast<std::uint8_t>(c) >> 3] & (1 << (static_cast<std::uint8_t>(c) & 7))))
+
 int http::Parser::parse(std::size_t bytes) // add some token chars arays
 {
 
@@ -15,17 +45,25 @@ int http::Parser::parse(std::size_t bytes) // add some token chars arays
     switch (m_state)
     {
     case REQUEST_METHOD:
-      if (*m_buffer != ' ') break;
+      if (*m_buffer != ' ') 
+      {
+        if (!IS_UPPER_ALPHA(*m_buffer)) return -1; 
+        break;
+      }
       method = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
       m_state = REQUEST_PATH_BEGIN;
       break;
     case REQUEST_PATH_BEGIN:
-      if (*m_buffer == ' ') break;
+      if (*m_buffer != '/') return -1;
       m_state = REQUEST_PATH;
       m_unhandledBuffer = m_buffer;
       break;
     case REQUEST_PATH:
-      if (*m_buffer != ' ') break;
+      if (*m_buffer != ' ')
+      {
+        if (!IS_URL_CHAR(*m_buffer)) return -1;
+        break;
+      }
       path = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
       m_state = REQUEST_H;
       break;
@@ -58,7 +96,7 @@ int http::Parser::parse(std::size_t bytes) // add some token chars arays
       m_state = REQUEST_HTTP_MAJOR; 
       break;
     case REQUEST_HTTP_MAJOR:
-      if (*m_buffer != '1') return -1;
+      if (*m_buffer != '1') return -1; // we will only accept 1.1 for now
       m_state = REQUEST_HTTP_ALMOST_END; 
       break;
     case REQUEST_HTTP_ALMOST_END:

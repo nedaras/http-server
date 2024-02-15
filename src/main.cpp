@@ -2,10 +2,10 @@
 #include <iostream>
 #include <sys/socket.h>
 
-void Handler(const Request& request, const Response& response)
+void Handler(const Request* request, const Response& response)
 {
 
-  std::cout << request.getHeader("Connection").value_or("Header not found") << "\n";
+  std::cout << request->getHeader("Connection").value_or("Header not found") << "\n";
 
   response.writeHead("Content-Type", "text/html");
   //response.writeHead("Content-Length", std::to_string(html.size()));
@@ -16,8 +16,7 @@ void Handler(const Request& request, const Response& response)
   response.write("</body></html>");
 
   // just for now
-  send(request.getSocket(), "0\r\n\r\n", 5, 0);
-
+  send(request->getSocket(), "0\r\n\r\n", 5, 0);
   //for now we closing automaticly
   //response.end(); // not if keep alive, but we should add some like timeout function
 

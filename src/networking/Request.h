@@ -7,7 +7,7 @@
 #include <vector>
 #include "../http/parser.h"
 
-enum RESPONSE_STATUS : char
+enum RESPONSE_STATUS : char // make into parser errors or sum
 {
   REQUEST_SUCCESS,
   REQUEST_TIMEOUT,

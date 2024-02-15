@@ -92,7 +92,7 @@ int Server::listen(const char* port)
         int clientSocket = accept(m_listenSocket, nullptr, nullptr);
         Request* request = new Request(clientSocket); // idk request will always be allocated so mby make that char buffer part of
                                                       // why do 2 allocations
-        
+
         epoll_event event;
 
         event.events = EPOLLIN;
@@ -108,8 +108,8 @@ int Server::listen(const char* port)
 
       Request* request = static_cast<Request*>(events[i].data.ptr);
 
-      int result = request->parse();
-      
+      int result = request->parse();     
+
       if (result == -1)
       {
 
@@ -118,6 +118,8 @@ int Server::listen(const char* port)
         event.events = EPOLLET;
         event.data.ptr = nullptr;
         
+        send(request->getSocket(), "WTF UR DOING", 12, 0);
+
         epoll_ctl(epoll, EPOLL_CTL_DEL, request->getSocket(), &event);
         close(request->getSocket());
         
@@ -131,8 +133,8 @@ int Server::listen(const char* port)
       {
 
         Response response(request->getSocket());
-        
-        m_callback(*request, response);
+      
+        m_callback(request, response);
 
         epoll_event event;
 
