@@ -1,13 +1,12 @@
 #include "parser.h"
 #include <cstdint>
-#include <iostream>
 
 // TODO: make return values an error return values
 // TODO: make some standards like what chars can be used idk utf-8 if im not bored
 // chunked encoding to
 
 // we need to bench mark these arrays couse making it 256 bytes altough would be bigger i think to acess it would be very fast
-static const std::uint8_t tokens[32] = { // wait http allows utf-8, thats pizda, these tokens ar not the standard, btw we dont use toekns
+static constexpr const std::uint8_t tokens[32] = { // wait http allows utf-8, thats pizda, these tokens ar not the standard, btw we dont use toekns
   0 | 0 | 0 | 0 | 0  | 0  | 0  | 0, 
   0 | 0 | 0 | 0 | 0  | 0  | 0  | 0, 
   0 | 0 | 0 | 0 | 0  | 0  | 0  | 0,
@@ -55,7 +54,7 @@ static constexpr bool IS_HEADER_CHAR(char c)
   return c == 9 || (static_cast<unsigned char>(c) > 31 && c != 127);
 }
 
-static bool IS_TOKEN(char c)
+static constexpr bool IS_TOKEN(char c)
 {
   return tokens[static_cast<std::uint8_t>(c) >> 3] & (1 << (static_cast<std::uint8_t>(c) & 7));
 }
