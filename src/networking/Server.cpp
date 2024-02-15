@@ -146,7 +146,7 @@ int Server::listen(const char* port)
         close(request->getSocket());
 
         events.pop_back();
-        delete request;
+        delete request; // i have that m_buffer gets deleted too
 
       }
 

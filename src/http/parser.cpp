@@ -1,11 +1,13 @@
 #include "parser.h"
+#include <cstdint>
+#include <iostream>
 
 // TODO: make return values an error return values
 // TODO: make some standards like what chars can be used idk utf-8 if im not bored
 // chunked encoding to
 
 // we need to bench mark these arrays couse making it 256 bytes altough would be bigger i think to acess it would be very fast
-static constexpr const std::uint8_t tokens[32] = { // wait http allows utf-8, thats pizda, these tokens ar not the standard, btw we dont use toekns
+static const std::uint8_t tokens[32] = { // wait http allows utf-8, thats pizda, these tokens ar not the standard, btw we dont use toekns
   0 | 0 | 0 | 0 | 0  | 0  | 0  | 0, 
   0 | 0 | 0 | 0 | 0  | 0  | 0  | 0, 
   0 | 0 | 0 | 0 | 0  | 0  | 0  | 0,
@@ -53,14 +55,14 @@ static constexpr bool IS_HEADER_CHAR(char c)
   return c == 9 || (static_cast<unsigned char>(c) > 31 && c != 127);
 }
 
-static constexpr bool IS_TOKEN(char c)
+static bool IS_TOKEN(char c)
 {
   return tokens[static_cast<std::uint8_t>(c) >> 3] & (1 << (static_cast<std::uint8_t>(c) & 7));
 }
 
 static constexpr bool IS_URL_CHAR(char c)
 {
-  return url_tokens[static_cast<std::uint8_t>(c) >> 3] & (1 << (static_cast<std::uint8_t>(c)) & 7);
+  return url_tokens[static_cast<std::uint8_t>(c) >> 3] & (1 << (static_cast<std::uint8_t>(c) & 7));
 }
 
 // if would want to add like some special state of headers, when using POST requests we will have to refactor this code
@@ -119,7 +121,7 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
       m_state = REQUEST_HTTP_MINOR; 
       break;
     case REQUEST_HTTP_MINOR:
-      if (*m_buffer != '1') return -1;
+      if (*m_buffer != '1') return -1; // we need other versions aa:w
       m_state = REQUEST_HTTP_DOT; 
       break;
     case REQUEST_HTTP_DOT:

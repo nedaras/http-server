@@ -16,7 +16,7 @@ int Request::parse()
   if (m_bufferLength + m_chunkSize > m_bufferSize) return -1; // return our of sizw or sum, just nake enum for return types
 
   ssize_t bytesRead = recv(m_socket, m_buffer.get() + m_bufferLength, m_chunkSize, 0);
-            
+  
   if (bytesRead == -1)
   {
     m_status = REQUEST_TIMEOUT; // req timeout is bullshit
