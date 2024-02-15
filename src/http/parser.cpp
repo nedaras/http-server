@@ -5,7 +5,7 @@
 // chunked encoding to
 
 // we need to bench mark these arrays couse making it 256 bytes altough would be bigger i think to acess it would be very fast
-static constexpr const std::uint8_t tokens[32] = { // wait http allows utf-8, thats pizda
+static constexpr const std::uint8_t tokens[32] = { // wait http allows utf-8, thats pizda, these tokens ar not the standard, btw we dont use toekns
   0 | 0 | 0 | 0 | 0  | 0  | 0  | 0, 
   0 | 0 | 0 | 0 | 0  | 0  | 0  | 0, 
   0 | 0 | 0 | 0 | 0  | 0  | 0  | 0,
@@ -63,6 +63,8 @@ static constexpr bool IS_URL_CHAR(char c)
   return url_tokens[static_cast<std::uint8_t>(c) >> 3] & (1 << (static_cast<std::uint8_t>(c)) & 7);
 }
 
+// if would want to add like some special state of headers, when using POST requests we will have to refactor this code
+// to make it more simple to obtain
 int http::Parser::parse(std::size_t bytes) // mb build unit tests
 {
 
@@ -76,7 +78,7 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
     case REQUEST_METHOD:
       if (*m_buffer != ' ') 
       {
-        if (!IS_UPPER_ALPHA(*m_buffer)) return -1; 
+        if (!IS_UPPER_ALPHA(*m_buffer)) return -1; // mb validate if request string is exsisting
         break;
       }
       method = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
@@ -143,7 +145,7 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
         break;
       }
 
-      // check if key char is alpha mb
+      // make diffrent struct that accepts A-Z;a-z;0-9;-;_;
       if (!IS_TOKEN(*m_buffer)) return -1;
       m_state = REQUEST_HEADER_KEY;
       m_unhandledBuffer = m_buffer;
@@ -155,10 +157,14 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
         break; 
       }
       m_header.key = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
+      m_state = REQUEST_HEADER_KEY_END;
+      break;
+    case REQUEST_HEADER_KEY_END:
+      if (*m_buffer != ' ') return -1;
       m_state = REQUEST_HEADER_VALUE_BEGIN;
       break;
     case REQUEST_HEADER_VALUE_BEGIN:
-      if (*m_buffer == ' ') break; // no no no we strict af f white space 
+      if (!IS_HEADER_CHAR(*m_buffer)) return -1;
       m_state = REQUEST_HEADER_VALUE;
       m_unhandledBuffer = m_buffer;
       break;
