@@ -165,23 +165,21 @@ void Server::m_makeResponse(Request* request)
 
   m_callback(request, response);
 
-  if (!request->m_dead)
-  {
+  if (request->m_dead) { delete request; return; }
+  if (!response.m_closed) return;
 
-    epoll_event event;
+  epoll_event event;
 
-    event.events = EPOLLET;
-    event.data.ptr = nullptr;
-    
-    epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event); // cant pass closed socket,
-                                                                     // btw we need state to handle keep alive
-    close(request->getSocket());
-    
-    m_mutex.lock();
-    m_events.pop_back();
-    m_mutex.unlock();
+  event.events = EPOLLET;
+  event.data.ptr = nullptr;
 
-  }
+  epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event); // cant pass closed socket,
+                                                                   // btw we need state to handle keep alive
+  close(request->getSocket());
+
+  m_mutex.lock();
+  m_events.pop_back();
+  m_mutex.unlock();
 
   delete request;
 

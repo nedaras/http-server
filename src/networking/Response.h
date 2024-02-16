@@ -18,9 +18,13 @@ public:
   void end() const;
 
 private:
+
+  friend class Server;
+
   // make it one bit 
   mutable bool m_headSent = false;
   mutable bool m_chunkSent = false;
+  mutable bool m_closed = false;
 
   int m_socket;
 

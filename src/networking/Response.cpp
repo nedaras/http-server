@@ -54,7 +54,7 @@ void Response::write(std::string_view buffer) const // send chunked, writeData w
   
   if (!m_chunkSent)
   {
-    send(m_socket, "\r\n", 2, 0); // check if first chunk then send it
+    send(m_socket, "\r\n", 2, 0);
     m_chunkSent = true;
   }
 
@@ -68,7 +68,7 @@ void Response::write(std::string_view buffer) const // send chunked, writeData w
 void Response::end() const
 {
 
-  send(m_socket, "0\r\n\r\n", 5, 0); // we will handle this diffrently
-  close(m_socket); // when implementing keep alive we will need todo some good shit  
+  m_closed = true;
+  send(m_socket, "0\r\n\r\n", 5, 0); //cool and all but when if we dont call end
 
 }
