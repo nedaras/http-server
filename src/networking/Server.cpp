@@ -1,7 +1,10 @@
 #include "Server.h"
 
+#include <atomic>
 #include <cerrno>
+#include <chrono>
 #include <iostream>
+#include <thread>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -18,10 +21,17 @@
 // TODO: chunked data handling
 // TODO: profit
 
-static void test(int x, int y)
+static std::atomic<int> works;
+
+static void work()
 {
-  
-  std::cout << (x + y) << "\n";
+ 
+  int work = works;
+  works++;
+
+  std::this_thread::sleep_for(std::chrono::seconds(5));
+
+  std::cout << work << " work done\n";
 
 }
 
@@ -143,7 +153,7 @@ int Server::listen(const char* port)
 
         Response response(request->getSocket());
         
-        threadPool.addTask(test, 69, 2);
+        threadPool.addTask(work); 
 
         m_callback(request, response);
 

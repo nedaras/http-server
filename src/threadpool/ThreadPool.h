@@ -25,7 +25,7 @@ public:
     
     std::lock_guard<std::mutex> lock(m_mutex);
 
-    m_tasks.push(task);
+    m_tasks.push(std::move(task));
 
     var.notify_one();
 

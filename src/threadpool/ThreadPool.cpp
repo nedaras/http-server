@@ -9,6 +9,13 @@ ThreadPool::~ThreadPool()
 
   m_running = false;
 
+  for (std::thread& worker : m_threads)
+  {
+
+    worker.join();
+
+  }
+
 }
 
 ThreadPool::ThreadPool(unsigned int threads)

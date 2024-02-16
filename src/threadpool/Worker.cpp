@@ -8,7 +8,9 @@ void Worker::operator()()
   while(m_threadPool->m_running)
   {
 
-    m_threadPool->var.wait(lock);    
+    m_threadPool->var.wait(lock, [this]{
+      return !this->m_threadPool->m_tasks.empty();
+    });    
 
     if (!m_threadPool->m_tasks.empty())
     {
