@@ -1,10 +1,5 @@
 #include "Server.h"
 
-#include <atomic>
-#include <cerrno>
-#include <chrono>
-#include <iostream>
-#include <thread>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -20,21 +15,7 @@
 // TODO: threadpoll
 // TODO: chunked data handling
 // TODO: profit
-
-static std::atomic<int> works;
-
-static void work()
-{
  
-  int work = works;
-  works++;
-
-  std::this_thread::sleep_for(std::chrono::seconds(5));
-
-  std::cout << work << " work done\n";
-
-}
-
 int Server::listen(const char* port)
 {
   
@@ -78,7 +59,7 @@ int Server::listen(const char* port)
 
   }
 
-  ThreadPool threadPool(4);
+  ThreadPool threadPool(std::thread::hardware_concurrency());
   int epoll = epoll_create1(0);
 
   std::vector<epoll_event> events;
@@ -103,7 +84,16 @@ int Server::listen(const char* port)
 
     for (int i = 0; i < epolls; i++)
     {
-      
+     
+      if (events[i].events & EPOLLET)
+      {
+
+        std::cout << "let ev\n";
+
+        continue;
+
+      }
+
       if (!(events[i].events & EPOLLIN)) continue;
       if (events[i].data.ptr == &m_listenSocket)
       {
@@ -151,23 +141,26 @@ int Server::listen(const char* port)
       if (result == 0) // throw this in thread pool and think how should we handle chunked encoding and stuff jeez
       {
 
-        Response response(request->getSocket());
-        
-        threadPool.addTask(work); 
+        threadPool.addTask([epoll, request, &events, this] {
 
-        m_callback(request, response);
+            Response response(request->getSocket());
 
-        epoll_event event;
+            m_callback(request, response);
 
-        event.events = EPOLLET;
-        event.data.ptr = nullptr;
+            epoll_event event;
 
-        epoll_ctl(epoll, EPOLL_CTL_DEL, request->getSocket(), &event); // cant pass closed socket,
-                                                                       // btw we need state to handle keep alive
-        close(request->getSocket());
+            event.events = EPOLLET;
+            event.data.ptr = nullptr;
 
-        events.pop_back();
-        delete request; // i have that m_buffer gets deleted too
+            epoll_ctl(epoll, EPOLL_CTL_DEL, request->getSocket(), &event); // cant pass closed socket,
+                                                                           // btw we need state to handle keep alive
+            close(request->getSocket());
+
+            events.pop_back();
+            delete request; // i have that m_buffer gets deleted too
+
+        });
+
 
       }
 

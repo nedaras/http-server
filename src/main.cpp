@@ -1,9 +1,12 @@
 #include "networking/Server.h"
 #include <iostream>
 #include <sys/socket.h>
+#include <thread>
 
 void Handler(const Request* request, const Response& response)
 {
+
+  std::this_thread::sleep_for(std::chrono::seconds(2));
 
   std::cout << request->getHeader("Connection").value_or("Header not found") << "\n";
 
