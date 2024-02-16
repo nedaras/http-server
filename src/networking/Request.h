@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -31,6 +32,8 @@ public:
   int parse();
 
 public:
+
+  std::atomic<bool> dead = false;
 
 private:
 

@@ -3,6 +3,7 @@
 #include "Request.h"
 #include "Response.h"
 #include <functional>
+#include <sys/epoll.h>
 
 class Server
 {
@@ -15,8 +16,15 @@ public:
 
 private:
 
+  void m_makeResponse(Request* request);
+
+private:
+
   const std::function<void(const Request* request, Response& response)> m_callback;
+  std::vector<epoll_event> m_events;
+
   int m_listenSocket;
+  int m_epoll;
 
 };
 

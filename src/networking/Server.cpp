@@ -1,5 +1,6 @@
 #include "Server.h"
 
+#include <functional>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -16,6 +17,8 @@
 // TODO: chunked data handling
 // TODO: profit
  
+
+
 int Server::listen(const char* port)
 {
   
@@ -60,9 +63,8 @@ int Server::listen(const char* port)
   }
 
   ThreadPool threadPool(std::thread::hardware_concurrency());
-  int epoll = epoll_create1(0);
+  m_epoll = epoll_create1(0);
 
-  std::vector<epoll_event> events;
   
   {
 
@@ -71,53 +73,43 @@ int Server::listen(const char* port)
     event.events = EPOLLIN;
     event.data.ptr = &m_listenSocket;
 
-    epoll_ctl(epoll, EPOLL_CTL_ADD, m_listenSocket, &event);
+    epoll_ctl(m_epoll, EPOLL_CTL_ADD, m_listenSocket, &event);
 
-    events.push_back({});
+    m_events.push_back({});
   
   }
   // where in the fuck is error handling hu? 
   while (true)
   {
 
-    int epolls = epoll_wait(epoll, events.data(), events.size(), -1);
+    int epolls = epoll_wait(m_epoll, m_events.data(), m_events.size(), -1);
 
     for (int i = 0; i < epolls; i++)
     {
      
-      if (events[i].events & EPOLLET)
-      {
-
-        std::cout << "let ev\n";
-
-        continue;
-
-      }
-
-      if (!(events[i].events & EPOLLIN)) continue;
-      if (events[i].data.ptr == &m_listenSocket)
+      if (!(m_events[i].events & EPOLLIN)) continue;
+      if (m_events[i].data.ptr == &m_listenSocket)
       {
 
         int clientSocket = accept(m_listenSocket, nullptr, nullptr);
-        Request* request = new Request(clientSocket); // idk request will always be allocated so mby make that char buffer part of
-                                                      // why do 2 allocations
+        Request* request = new Request(clientSocket);
 
         epoll_event event;
 
         event.events = EPOLLIN;
         event.data.ptr = request;
 
-        epoll_ctl(epoll, EPOLL_CTL_ADD, clientSocket, &event);
+        epoll_ctl(m_epoll, EPOLL_CTL_ADD, clientSocket, &event);
 
-        events.push_back({});
+        m_events.push_back({});
 
         continue;
 
       }
 
-      Request* request = static_cast<Request*>(events[i].data.ptr);
+      Request* request = static_cast<Request*>(m_events[i].data.ptr);
 
-      int result = request->parse();     
+      int result = request->parse(); // put in worker to? 
 
       if (result == -1)
       {
@@ -129,38 +121,21 @@ int Server::listen(const char* port)
         
         send(request->getSocket(), "WTF UR DOING", 12, 0);
 
-        epoll_ctl(epoll, EPOLL_CTL_DEL, request->getSocket(), &event);
+        request->dead = true;
+
+        epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event);
         close(request->getSocket());
         
-        events.pop_back();
+        m_events.pop_back();
         delete request;
-
+      
         continue;
       }
 
       if (result == 0) // throw this in thread pool and think how should we handle chunked encoding and stuff jeez
       {
 
-        threadPool.addTask([epoll, request, &events, this] {
-
-            Response response(request->getSocket());
-
-            m_callback(request, response);
-
-            epoll_event event;
-
-            event.events = EPOLLET;
-            event.data.ptr = nullptr;
-
-            epoll_ctl(epoll, EPOLL_CTL_DEL, request->getSocket(), &event); // cant pass closed socket,
-                                                                           // btw we need state to handle keep alive
-            close(request->getSocket());
-
-            events.pop_back();
-            delete request; // i have that m_buffer gets deleted too
-
-        });
-
+        threadPool.addTask(&Server::m_makeResponse, this, request); // handle closing conection, couse now we just crashing
 
       }
 
@@ -173,11 +148,35 @@ int Server::listen(const char* port)
   event.events = EPOLLET;
   event.data.ptr = nullptr;
 
-  epoll_ctl(epoll, EPOLL_CTL_DEL, m_listenSocket, &event);
+  epoll_ctl(m_epoll, EPOLL_CTL_DEL, m_listenSocket, &event);
 
   close(m_listenSocket);
-  close(epoll); 
+  close(m_epoll); 
 
   return 0; 
+
+}
+
+void Server::m_makeResponse(Request* request) // add state to check if con is closed
+{
+
+  Response response(request->getSocket());
+
+  m_callback(request, response);
+
+  if (request->dead) return;
+
+  epoll_event event;
+
+  event.events = EPOLLET;
+  event.data.ptr = nullptr;
+
+  epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event); // cant pass closed socket,
+                                                                 // btw we need state to handle keep alive
+  close(request->getSocket());
+
+  m_events.pop_back();
+
+  delete request; // i have that m_buffer gets deleted too
 
 }
