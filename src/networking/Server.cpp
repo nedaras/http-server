@@ -100,7 +100,8 @@ int Server::listen(const char* port)
         event.data.ptr = request;
 
         epoll_ctl(m_epoll, EPOLL_CTL_ADD, clientSocket, &event);
-
+        
+        std::lock_guard<std::mutex> lock(m_mutex);
         m_events.push_back({});
 
         continue;
@@ -109,7 +110,7 @@ int Server::listen(const char* port)
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
 
-      int result = request->parse(); // put in worker to? 
+      int result = request->parse();
 
       if (result == -1)
       {
@@ -121,20 +122,27 @@ int Server::listen(const char* port)
         
         send(request->getSocket(), "WTF UR DOING", 12, 0);
 
-        request->dead = true;
+        request->m_dead = true;
 
         epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event);
         close(request->getSocket());
         
+        m_mutex.lock();
         m_events.pop_back();
-        delete request;
-      
+        m_mutex.unlock(); // mb we can remove those atomic vals in request and under one lock manipulate them     
+
+        if (!request->m_working) delete request;
+
         continue;
+
       }
 
       if (result == 0) // throw this in thread pool and think how should we handle chunked encoding and stuff jeez
       {
+        // how will multiplexing work in these threads, if we can multiplex we dont want to hold queue
+        // mby put every read in threadpool
 
+        request->m_working = true;
         threadPool.addTask(&Server::m_makeResponse, this, request); // handle closing conection, couse now we just crashing
 
       }
@@ -142,7 +150,7 @@ int Server::listen(const char* port)
     }
 
   }
-
+  // shut down threadpool here
   epoll_event event;
   
   event.events = EPOLLET;
@@ -157,26 +165,32 @@ int Server::listen(const char* port)
 
 }
 
-void Server::m_makeResponse(Request* request) // add state to check if con is closed
+void Server::m_makeResponse(Request* request)
 {
 
   Response response(request->getSocket());
 
   m_callback(request, response);
 
-  if (request->dead) return;
+  if (!request->m_dead)
+  {
 
-  epoll_event event;
+    epoll_event event;
 
-  event.events = EPOLLET;
-  event.data.ptr = nullptr;
+    event.events = EPOLLET;
+    event.data.ptr = nullptr;
+    
+    // epoll_ctl is thread safe
+    epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event); // cant pass closed socket,
+                                                                     // btw we need state to handle keep alive
+    close(request->getSocket());
+    
+    m_mutex.lock();
+    m_events.pop_back();
+    m_mutex.unlock();
 
-  epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event); // cant pass closed socket,
-                                                                 // btw we need state to handle keep alive
-  close(request->getSocket());
+  }
 
-  m_events.pop_back();
-
-  delete request; // i have that m_buffer gets deleted too
+  delete request;
 
 }

@@ -6,7 +6,7 @@
 void Handler(const Request* request, const Response& response)
 {
 
-  std::this_thread::sleep_for(std::chrono::seconds(2));
+  //std::this_thread::sleep_for(std::chrono::seconds(2));
 
   std::cout << request->getHeader("Connection").value_or("Header not found") << "\n";
 

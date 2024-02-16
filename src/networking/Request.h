@@ -31,13 +31,16 @@ public:
 
   int parse();
 
-public:
-
-  std::atomic<bool> dead = false;
 
 private:
 
+  friend class Server;
+
   int m_socket;
+
+  std::atomic<bool> m_dead = false;
+  std::atomic<bool> m_working = false;
+
   http::Parser m_parser;// i dont like to refrence it 
   
   constexpr static std::size_t m_bufferSize = 8 * 1024;
