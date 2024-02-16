@@ -24,7 +24,7 @@ void Handler(const Request* request, const Response& response)
 
 int main()
 {
-  
+ 
   Server server(Handler);
 
   server.listen("3000");

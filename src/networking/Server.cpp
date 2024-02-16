@@ -9,6 +9,7 @@
 #include "./Request.h"
 #include "Response.h"
 #include <vector>
+#include "../threadpool/ThreadPool.h"
 
 // TODO: better api,
 // TODO: handle errors
@@ -16,6 +17,13 @@
 // TODO: threadpoll
 // TODO: chunked data handling
 // TODO: profit
+
+static void test(int x, int y)
+{
+  
+  std::cout << (x + y) << "\n";
+
+}
 
 int Server::listen(const char* port)
 {
@@ -60,6 +68,7 @@ int Server::listen(const char* port)
 
   }
 
+  ThreadPool threadPool(4);
   int epoll = epoll_create1(0);
 
   std::vector<epoll_event> events;
@@ -133,7 +142,9 @@ int Server::listen(const char* port)
       {
 
         Response response(request->getSocket());
-      
+        
+        threadPool.addTask(test, 69, 2);
+
         m_callback(request, response);
 
         epoll_event event;
