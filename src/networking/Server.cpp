@@ -16,9 +16,8 @@
 // TODO: threadpoll
 // TODO: chunked data handling
 // TODO: profit
+// TODO: turn of recv travic if we aint expecting to recv
  
-
-
 int Server::listen(const char* port)
 {
   
@@ -100,52 +99,46 @@ int Server::listen(const char* port)
         event.data.ptr = request;
 
         epoll_ctl(m_epoll, EPOLL_CTL_ADD, clientSocket, &event);
-        
-        std::lock_guard<std::mutex> lock(m_mutex);
-        m_events.push_back({});
+
+        m_mutex.lock();
+        m_events.push_back({}); // cant we like have an event will trigger on epoll delete
+        m_mutex.unlock(); 
 
         continue;
 
       }
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
+      REQUEST_STATUS status = request->parse();
 
-      int result = request->parse();
-
-      if (result == -1)
+      if (status == REQUEST_SUCCESS) // think how should we handle chunked encoding and stuff jeez
       {
+        // how will multiplexing work in these threads, if we can multiplex we dont want to hold queue
 
-        epoll_event event;
-
-        event.events = EPOLLET;
-        event.data.ptr = nullptr;
-        
-        send(request->getSocket(), "WTF UR DOING", 12, 0);
-
-        request->m_dead = true;
-
-        epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event);
-        close(request->getSocket());
-        
-        m_mutex.lock();
-        m_events.pop_back();
-        m_mutex.unlock(); // mb we can remove those atomic vals in request and under one lock manipulate them     
-
-        if (!request->m_working) delete request;
-
+        request->m_working = true;
+        threadPool.addTask(&Server::m_makeResponse, this, request); // handle closing conection, couse now we just crashing
+  
         continue;
 
       }
 
-      if (result == 0) // throw this in thread pool and think how should we handle chunked encoding and stuff jeez
-      {
-        // how will multiplexing work in these threads, if we can multiplex we dont want to hold queue
-        // mby put every read in threadpool
+      epoll_event event;
 
-        request->m_working = true;
-        threadPool.addTask(&Server::m_makeResponse, this, request); // handle closing conection, couse now we just crashing
+      event.events = EPOLLET;
+      event.data.ptr = nullptr;
 
-      }
+      send(request->getSocket(), "WTF UR DOING", 12, 0);
+
+      request->m_dead = true;
+
+      epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event);
+      close(request->getSocket());
+
+      m_mutex.lock();
+      m_events.pop_back();
+      m_mutex.unlock(); // mb we can remove those atomic vals in request and under one lock manipulate them     
+
+      if (!request->m_working) delete request;
 
     }
 
@@ -180,7 +173,6 @@ void Server::m_makeResponse(Request* request)
     event.events = EPOLLET;
     event.data.ptr = nullptr;
     
-    // epoll_ctl is thread safe
     epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event); // cant pass closed socket,
                                                                      // btw we need state to handle keep alive
     close(request->getSocket());

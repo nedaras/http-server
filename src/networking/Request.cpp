@@ -10,28 +10,28 @@ Request::Request(int socket)
 
 }
 
-int Request::parse()
+REQUEST_STATUS Request::parse() // make even more states
 {
 
-  if (m_bufferLength + m_chunkSize > m_bufferSize) return -1; // return our of sizw or sum, just nake enum for return types
+  if (m_bufferLength + m_chunkSize > m_bufferSize) return REQUEST_HTTP_BUFFER_ERROR;
 
   ssize_t bytesRead = recv(m_socket, m_buffer.get() + m_bufferLength, m_chunkSize, 0);
   
-  if (bytesRead == -1)
+  if (bytesRead > 0)
   {
-    m_status = REQUEST_TIMEOUT; // req timeout is bullshit
-    return -1;
+
+    m_bufferLength += bytesRead;    
+
+    switch (m_parser.parse(bytesRead))
+    {
+    case 0: return REQUEST_SUCCESS;
+    case 1: return REQUEST_INCOMPLETE;
+    default: return REQUEST_HTTP_ERROR;
+    }
+
   }
 
-  if (bytesRead == 0)
-  {
-    m_status = REQUEST_CLOSE; 
-    return -1;
-  }
-
-  m_bufferLength += bytesRead;    
-  
-  return m_parser.parse(bytesRead);
+  return bytesRead == 0 ? REQUEST_CLOSE : REQUEST_ERROR;
 
 }
 

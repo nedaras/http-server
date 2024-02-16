@@ -5,13 +5,14 @@
 
 void Handler(const Request* request, const Response& response)
 {
+  // GOAL: non blocking read chunks and write to file, meaning that we can have unlimited conections
+  // GOAL: intensive CPU work for handling chunked data, meaning async io with multithreading together
 
   //std::this_thread::sleep_for(std::chrono::seconds(2));
 
   std::cout << request->getHeader("Connection").value_or("Header not found") << "\n";
 
   response.writeHead("Content-Type", "text/html");
-  //response.writeHead("Content-Length", std::to_string(html.size()));
   response.writeHead("Transfer-Encoding", "chunked");
 
   response.write("<!DOCTYPE html><html><head></head><body><h1>hello world</h1>");

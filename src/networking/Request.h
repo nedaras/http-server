@@ -8,11 +8,15 @@
 #include <vector>
 #include "../http/parser.h"
 
-enum RESPONSE_STATUS : char // make into parser errors or sum
+enum REQUEST_STATUS
 {
   REQUEST_SUCCESS,
-  REQUEST_TIMEOUT,
-  REQUEST_CLOSE
+  REQUEST_INCOMPLETE,
+  REQUEST_ERROR,
+  REQUEST_CLOSE,
+  REQUEST_HTTP_ERROR,
+  REQUEST_HTTP_BUFFER_ERROR,
+  REQUEST_CHUNK_ERROR 
 };
 
 class Request
@@ -29,8 +33,7 @@ public:
     return m_socket;
   }
 
-  int parse();
-
+  REQUEST_STATUS parse();
 
 private:
 
@@ -41,14 +44,12 @@ private:
   std::atomic<bool> m_dead = false;
   std::atomic<bool> m_working = false;
 
-  http::Parser m_parser;// i dont like to refrence it 
+  http::Parser m_parser;
   
   constexpr static std::size_t m_bufferSize = 8 * 1024;
   constexpr static std::size_t m_chunkSize = 1024;
 
   std::unique_ptr<char[]> m_buffer = std::make_unique<char[]>(m_bufferSize); // this has to be unique, aka deleted at class destructor
   std::size_t m_bufferLength = 0; 
-
-  RESPONSE_STATUS m_status = REQUEST_SUCCESS;
 
 };
