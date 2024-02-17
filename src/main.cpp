@@ -4,23 +4,28 @@
 
 // i think best practise is to handle non blocking io in main thread and intensive cpu work in threadpool
 
-
+static int req = 0;
 
 // so this is intensive cpu but we can like add request.onData and do dome stuff im main thread
 //
 // mb make Handler func single threaded an inside we can specify if we want to throw it inside threadpool???,
 // thats has to be the best thing
-void Handler(Request* request, const Response& response)
+void Handler(const Request* request, const Response& response)
 {
   // GOAL: non blocking read chunks and write to file, meaning that we can have unlimited conections
   // GOAL: intensive CPU work for handling chunked data, meaning async io with multithreading together
-
-  std::cout << "Connection: " << request->getHeader("Connection").value_or("Header not found") << "\n";
+  
+  req++;
 
   // i thing request should hold response
+  // make some wrapper functions to prevent dumb errors, like passing response by ref
   std::thread([request, response] {
 
-      std::this_thread::sleep_for(std::chrono::seconds(5));
+      std::cout << "Connection: " << req  << request->getHeader("Connection").value_or("Header not found") << "\n";
+
+      std::this_thread::sleep_for(std::chrono::seconds(10));
+
+      std::cout << "Connection 2: " << request->getHeader("Connection").value_or("Header not found") << "\n";
 
       response.writeHead("Content-Type", "text/html");
       response.writeHead("Transfer-Encoding", "chunked");
@@ -32,11 +37,8 @@ void Handler(Request* request, const Response& response)
 
       // we can do threadpool.addTask, do saome long calculation and call inside response.end
 
-      response.end(request); // this should say that we ended the request.
-                      // what it would mean is that we would just reset the request object
+      response.end(); // this should say that we ended the request.
   }).detach(); 
-
-
 
 }
 

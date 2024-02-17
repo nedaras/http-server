@@ -19,6 +19,7 @@ enum REQUEST_STATUS
   REQUEST_CHUNK_ERROR 
 };
 
+// can we make this dude hold everything
 class Request
 {
 
@@ -33,8 +34,9 @@ public:
 private:
 
   friend class Server;
+  friend class Response;
 
-  int m_socket;
+  std::atomic<int> m_socket;
 
   bool m_parsed = false;
 

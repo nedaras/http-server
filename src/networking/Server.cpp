@@ -1,6 +1,5 @@
 #include "Server.h"
 
-#include <atomic>
 #include <iostream>
 #include <cerrno>
 #include <cstring>
@@ -114,11 +113,6 @@ int Server::listen(const char* port)
         }
 
         Request* request = new Request(clientSocket); // do we need to check if ptr is nullptr?
-        
-        std::cout << "new con: " << request << "\n";
-        std::cout << "total allocations " << allocated_requests << "\n";
-        allocated_requests++;        
-
         epoll_event event;
 
         event.events = EPOLLIN | EPOLLET; 
@@ -138,29 +132,38 @@ int Server::listen(const char* port)
 
       }
 
+
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
       REQUEST_STATUS status = request->parse();
-
-      Response response(request->m_socket, this);
-
+      
+      epoll_event event {};
+      
       switch (status)
       {
       case REQUEST_SUCCESS:
-        m_callback(request, response);
+        m_callback(request, Response(request, this));
         break;
       case REQUEST_INCOMPLETE:
         break;
-      case REQUEST_CLOSE: // if were not executing a request, just close
-        std::cout << "close\n";
+      case REQUEST_CLOSE:
+
+        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
+
+        m_mutex.lock();
+        m_events.pop_back();
+        m_mutex.unlock();
+
+        close(request->m_socket);
+        request->m_socket = 0;
+
+        if (!request->m_parsed) delete request;
+
         break;
       case REQUEST_CHUNK_ERROR:
         std::cout << "REQUEST_CHUNK_ERROR\n";
         break;
       default:
-
-        epoll_event event {};
-
-        send(request->m_socket, "WTF UR DOING", 12, 0);
+        send(request->m_socket, "WTF UR DOING", 12, 0); // send some http response
 
         if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
 
@@ -170,7 +173,6 @@ int Server::listen(const char* port)
 
         close(request->m_socket);
         delete request;
-        allocated_requests--;
         
         break;
       }

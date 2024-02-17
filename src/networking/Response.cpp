@@ -3,25 +3,30 @@
 #include "Request.h"
 #include "Server.h"
 #include <cstddef>
+#include <cstring>
 #include <iostream>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
+#define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // throwed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
+
 // TODO: some err handling for invalid sockets
 void Response::writeHead(std::string_view key, std::string_view value) const
 {
 
+  if (m_request->m_socket == 0) return;
+
   if (!m_headSent)
   {
-    send(m_socket, "HTTP/1.1 200 OK\r\n", 16, MSG_NOSIGNAL);
+    send(m_request->m_socket, "HTTP/1.1 200 OK\r\n", 16, 0);
     m_headSent = true;
   }
 
-  send(m_socket, key.data(), key.size(), MSG_NOSIGNAL);
-  send(m_socket, ": ", 2, MSG_NOSIGNAL);
-  send(m_socket, value.data(), value.size(), MSG_NOSIGNAL);
-  send(m_socket, "\r\n", 2, MSG_NOSIGNAL);
+  send(m_request->m_socket, key.data(), key.size(), 0);
+  send(m_request->m_socket, ": ", 2, 0);
+  send(m_request->m_socket, value.data(), value.size(), 0);
+  send(m_request->m_socket, "\r\n", 2, 0);
 
 }
 
@@ -51,6 +56,8 @@ static std::size_t toHex(char*& buffer, std::size_t number)
 void Response::write(std::string_view buffer) const // send chunked, writeData will send not chunked
 {
 
+  if (m_request->m_socket == 0) return;
+
   if (buffer.size() > 0x10000) return; // sending too much, break it up
 
   char hexBuffer[5];
@@ -60,40 +67,40 @@ void Response::write(std::string_view buffer) const // send chunked, writeData w
   
   if (!m_chunkSent)
   {
-    send(m_socket, "\r\n", 2, MSG_NOSIGNAL);
+    send(m_request->m_socket, "\r\n", 2, 0);
     m_chunkSent = true;
   }
 
-  send(m_socket, pHexBuffer, length, MSG_NOSIGNAL);
-  send(m_socket, "\r\n", 2, MSG_NOSIGNAL);
-  send(m_socket, buffer.data(), buffer.size(), MSG_NOSIGNAL);
-  send(m_socket, "\r\n", 2, MSG_NOSIGNAL);
+  send(m_request->m_socket, pHexBuffer, length, 0);
+  send(m_request->m_socket, "\r\n", 2, 0);
+  send(m_request->m_socket, buffer.data(), buffer.size(), 0);
+  send(m_request->m_socket, "\r\n", 2, 0);
 
 }
 
-void Response::end(Request* request) const
+void Response::end() const
 {
 
-  send(m_socket, "0\r\n\r\n", 5, MSG_NOSIGNAL);
+  if (m_request->m_socket == 0)
+  {
+    delete m_request;
+    return;
+  }
+
+  send(m_request->m_socket, "0\r\n\r\n", 5, MSG_NOSIGNAL);
 
   epoll_event event {};
   
   Server* server = static_cast<Server*>(m_server);
-
-  if (epoll_ctl(server->m_epoll, EPOLL_CTL_DEL, m_socket, &event) == -1)
-  {
-
-    std::cout << "err in Response\n";
-
-  }
+  
+  if (epoll_ctl(server->m_epoll, EPOLL_CTL_DEL, m_request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
 
   server->m_mutex.lock();
   server->m_events.pop_back();
   server->m_mutex.unlock();
 
-  close(m_socket);
+  close(m_request->m_socket);
 
-  delete request; // fuck
-  server->allocated_requests--;
+  delete m_request;
 
 }
