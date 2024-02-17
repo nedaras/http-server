@@ -11,7 +11,7 @@
 #include "./Request.h"
 #include "../threadpool/ThreadPool.h"
 
-#define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // throwed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
+#define PRINT_ERROR() std::cout << __FILE__  ":" << __LINE__ - 1 << "\n\tbind(); // throwed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
 
 // TODO: better api,
 // TODO: handle errors
@@ -32,9 +32,11 @@ int Server::listen(const char* port)
   params.ai_protocol = IPPROTO_TCP;
   params.ai_flags = AI_PASSIVE;
 
+  PRINT_ERROR();
+
   if (getaddrinfo(nullptr, port, &params, &result))
   {
-    PRINT_ERROR("getaddrinfo", 2);
+    std::perror("err");
     return 1;
   }
 
@@ -42,7 +44,6 @@ int Server::listen(const char* port)
   
   if (m_listenSocket == -1)
   {
-    PRINT_ERROR("socket", 4);
     return 1;
   }
 

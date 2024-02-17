@@ -2,6 +2,14 @@
 #include <iostream>
 #include <sys/socket.h>
 
+// i think best practise is to handle non blocking io in main thread and intensive cpu work in threadpool
+
+
+
+// so this is intensive cpu but we can like add request.onData and do dome stuff im main thread
+//
+// mb make Handler func single threaded an inside we can specify if we want to throw it inside threadpool???,
+// thats has to be the best thing
 void Handler(const Request* request, const Response& response)
 {
   // GOAL: non blocking read chunks and write to file, meaning that we can have unlimited conections
@@ -17,7 +25,9 @@ void Handler(const Request* request, const Response& response)
   response.write("<h2>this is a chunk</h2>");
   response.write("</body></html>");
 
-  response.end(); // should res end like close connection, or it just means that we done this connection
+  // we can do threadpool.addTask, do saome long calculation and call inside response.end
+
+  response.end(); // this should say that we ended the request.
 
 }
 
