@@ -11,7 +11,7 @@
 
 #define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // throwed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
 
-// TODO: some err handling for invalid sockets
+// TODO: some err handling for invalid sockets, yee fr couse it be crashing
 void Response::writeHead(std::string_view key, std::string_view value) const
 {
 
@@ -20,13 +20,18 @@ void Response::writeHead(std::string_view key, std::string_view value) const
   if (!m_headSent)
   {
     send(m_request->m_socket, "HTTP/1.1 200 OK\r\n", 16, 0);
+    std::cout << "sent 1 header\n";
     m_headSent = true;
   }
 
   send(m_request->m_socket, key.data(), key.size(), 0);
+    std::cout << "sent 2 header\n";
   send(m_request->m_socket, ": ", 2, 0);
+    std::cout << "sent 3 header\n";
   send(m_request->m_socket, value.data(), value.size(), 0);
+    std::cout << "sent 4 header\n";
   send(m_request->m_socket, "\r\n", 2, 0);
+    std::cout << "sent 5 header\n";
 
 }
 

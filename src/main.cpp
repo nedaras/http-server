@@ -17,20 +17,18 @@ void Handler(const Request* request, const Response& response)
   
   req++;
 
+  std::cout << request->getPath() << "\n";
+
   if (request->getPath() == "/long")
   {
-
+    
     std::thread([request, response] {
-
-      std::cout << "long Connection: " << req  << request->getHeader("Connection").value_or("Header not found") << "\n";
 
       std::this_thread::sleep_for(std::chrono::seconds(10));
 
-      std::cout << "Connection 2: " << request->getHeader("Connection").value_or("Header not found") << "\n";
-
       response.writeHead("Content-Type", "text/html");
       response.writeHead("Transfer-Encoding", "chunked");
-      response.writeHead("Connection", "keep-alive");
+      response.writeHead("Connection", "closed");
 
       response.write("<!DOCTYPE html><html><head></head><body><h1>hello world</h1>");
       response.write("<h2>this is a chunk</h2>");
@@ -45,11 +43,9 @@ void Handler(const Request* request, const Response& response)
 
   }
 
-  std::cout << "short Connection: " << req  << request->getHeader("Connection").value_or("Header not found") << "\n";
-
   response.writeHead("Content-Type", "text/html");
   response.writeHead("Transfer-Encoding", "chunked");
-  response.writeHead("Connection", "keep-alive");
+  response.writeHead("Connection", "closed");
 
   response.write("<!DOCTYPE html><html><head></head><body><h1>hello world</h1>");
   response.write("<h2>this is a chunk</h2>");

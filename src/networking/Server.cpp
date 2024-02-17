@@ -105,7 +105,7 @@ int Server::listen(const char* port)
       {
 
         int clientSocket = accept(m_listenSocket, nullptr, nullptr); // but these addresses in request
-
+        
         if (clientSocket == -1)
         {
           PRINT_ERROR("accept", 2);
@@ -113,6 +113,9 @@ int Server::listen(const char* port)
         }
 
         Request* request = new Request(clientSocket); // do we need to check if ptr is nullptr?
+        
+        if (request == nullptr) std::cout << "nullptr request\n";                                              
+
         epoll_event event;
 
         event.events = EPOLLIN | EPOLLET; 
@@ -132,12 +135,13 @@ int Server::listen(const char* port)
 
       }
 
-
+      std::cout << "new read" << "\n";
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
       REQUEST_STATUS status = request->parse();
       
       epoll_event event {};
       
+
       switch (status)
       {
       case REQUEST_SUCCESS:
