@@ -17,11 +17,12 @@ void Handler(const Request* request, const Response& response)
   
   req++;
 
-  // i thing request should hold response
-  // make some wrapper functions to prevent dumb errors, like passing response by ref
-  std::thread([request, response] {
+  if (request->getPath() == "/long")
+  {
 
-      std::cout << "Connection: " << req  << request->getHeader("Connection").value_or("Header not found") << "\n";
+    std::thread([request, response] {
+
+      std::cout << "long Connection: " << req  << request->getHeader("Connection").value_or("Header not found") << "\n";
 
       std::this_thread::sleep_for(std::chrono::seconds(10));
 
@@ -38,7 +39,23 @@ void Handler(const Request* request, const Response& response)
       // we can do threadpool.addTask, do saome long calculation and call inside response.end
 
       response.end(); // this should say that we ended the request.
-  }).detach(); 
+    }).detach(); 
+   
+    return;
+
+  }
+
+  std::cout << "short Connection: " << req  << request->getHeader("Connection").value_or("Header not found") << "\n";
+
+  response.writeHead("Content-Type", "text/html");
+  response.writeHead("Transfer-Encoding", "chunked");
+  response.writeHead("Connection", "keep-alive");
+
+  response.write("<!DOCTYPE html><html><head></head><body><h1>hello world</h1>");
+  response.write("<h2>this is a chunk</h2>");
+  response.write("</body></html>");
+
+  response.end();
 
 }
 

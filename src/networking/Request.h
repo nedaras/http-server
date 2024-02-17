@@ -29,6 +29,8 @@ public:
 
   std::optional<std::string_view> getHeader(std::string_view header) const;
 
+  std::string_view getPath() const;
+
   REQUEST_STATUS parse();
 
 private:

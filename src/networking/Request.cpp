@@ -49,3 +49,10 @@ std::optional<std::string_view> Request::getHeader(std::string_view header) cons
   return {};
 
 }
+
+std::string_view Request::getPath() const
+{
+
+  return m_parser.path;
+
+}
