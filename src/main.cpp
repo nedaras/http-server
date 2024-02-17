@@ -1,6 +1,8 @@
 #include "networking/Server.h"
+#include <chrono>
 #include <iostream>
 #include <sys/socket.h>
+#include <thread>
 #include <unistd.h>
 
 // i think best practise is to handle non blocking io in main thread and intensive cpu work in threadpool
@@ -17,6 +19,8 @@ void Handler(const Request* request, const Response& response)
   // GOAL: intensive CPU work for handling chunked data, meaning async io with multithreading together
 
   std::cout << "Connection: " << request->getHeader("Connection").value_or("Header not found") << "\n";
+
+  std::this_thread::sleep_for(std::chrono::seconds(5));
 
   response.writeHead("Content-Type", "text/html");
   response.writeHead("Transfer-Encoding", "chunked");

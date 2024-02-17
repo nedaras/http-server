@@ -1,23 +1,26 @@
 #include "Response.h"
+
+#include "Server.h"
 #include <cstddef>
 #include <iostream>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
+// TODO: some err handling for invalid sockets
 void Response::writeHead(std::string_view key, std::string_view value) const
 {
 
   if (!m_headSent)
   {
-    send(m_socket, "HTTP/1.1 200 OK\r\n", 16, 0);
+    send(m_socket, "HTTP/1.1 200 OK\r\n", 16, MSG_NOSIGNAL);
     m_headSent = true;
   }
 
-  send(m_socket, key.data(), key.size(), 0);
-  send(m_socket, ": ", 2, 0);
-  send(m_socket, value.data(), value.size(), 0);
-  send(m_socket, "\r\n", 2, 0);
+  send(m_socket, key.data(), key.size(), MSG_NOSIGNAL);
+  send(m_socket, ": ", 2, MSG_NOSIGNAL);
+  send(m_socket, value.data(), value.size(), MSG_NOSIGNAL);
+  send(m_socket, "\r\n", 2, MSG_NOSIGNAL);
 
 }
 
@@ -56,32 +59,36 @@ void Response::write(std::string_view buffer) const // send chunked, writeData w
   
   if (!m_chunkSent)
   {
-    send(m_socket, "\r\n", 2, 0);
+    send(m_socket, "\r\n", 2, MSG_NOSIGNAL);
     m_chunkSent = true;
   }
 
-  send(m_socket, pHexBuffer, length, 0);
-  send(m_socket, "\r\n", 2, 0);
-  send(m_socket, buffer.data(), buffer.size(), 0);
-  send(m_socket, "\r\n", 2, 0);
+  send(m_socket, pHexBuffer, length, MSG_NOSIGNAL);
+  send(m_socket, "\r\n", 2, MSG_NOSIGNAL);
+  send(m_socket, buffer.data(), buffer.size(), MSG_NOSIGNAL);
+  send(m_socket, "\r\n", 2, MSG_NOSIGNAL);
 
 }
 
 void Response::end() const
 {
 
-  send(m_socket, "0\r\n\r\n", 5, 0); //cool and all but when if we dont call end
+  send(m_socket, "0\r\n\r\n", 5, MSG_NOSIGNAL);
 
   epoll_event event {};
+  
+  Server* server = static_cast<Server*>(m_server);
 
-  if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, m_socket, &event) == -1)
+  if (epoll_ctl(server->m_epoll, EPOLL_CTL_DEL, m_socket, &event) == -1)
   {
 
     std::cout << "err in Response\n";
 
   }
 
-  // we need to remove queue
+  server->m_mutex.lock();
+  server->m_events.pop_back();
+  server->m_mutex.unlock();
 
   close(m_socket);
 

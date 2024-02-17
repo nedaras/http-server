@@ -97,8 +97,6 @@ int Server::listen(const char* port)
 
     int epolls = epoll_wait(m_epoll, m_events.data(), m_events.size(), -1);
 
-    std::cout << m_events.size() << "\n";
-
     for (int i = 0; i < epolls; i++)
     {
     
@@ -138,20 +136,21 @@ int Server::listen(const char* port)
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
       REQUEST_STATUS status = request->parse();
 
-      Response response(request->m_socket, m_epoll);
+      Response response(request->m_socket, this);
 
       switch (status)
       {
       case REQUEST_SUCCESS:
         m_callback(request, response);
-
         break;
       case REQUEST_INCOMPLETE:
+      case REQUEST_CLOSE: // if were not executing a request, just close
         break;
       case REQUEST_CHUNK_ERROR:
         std::cout << "REQUEST_CHUNK_ERROR";
         break;
       default:
+
         epoll_event event {};
 
         send(request->m_socket, "WTF UR DOING", 12, 0);

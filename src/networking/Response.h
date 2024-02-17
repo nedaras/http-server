@@ -7,7 +7,7 @@ class Response
 
 public:
 
-  Response(int socket, int epoll) : m_socket(socket), m_epoll(epoll) {};
+  Response(int socket, void* server) : m_socket(socket), m_server(server) {}; // i dont like that void ptr
 
   void writeHead(std::string_view key, std::string_view value) const;
 
@@ -22,7 +22,7 @@ private:
   friend class Server;
 
   int m_socket;
-  int m_epoll;
+  void* m_server;
 
   mutable bool m_headSent = false;
   mutable bool m_chunkSent = false;
