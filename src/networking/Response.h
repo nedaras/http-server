@@ -7,7 +7,7 @@ class Response
 
 public:
 
-  Response(int socket) : m_socket(socket) {};
+  Response(int socket, int epoll) : m_socket(socket), m_epoll(epoll) {};
 
   void writeHead(std::string_view key, std::string_view value) const;
 
@@ -21,12 +21,11 @@ private:
 
   friend class Server;
 
-  // make it one bit 
+  int m_socket;
+  int m_epoll;
+
   mutable bool m_headSent = false;
   mutable bool m_chunkSent = false;
-  mutable bool m_closed = false;
-
-  int m_socket;
 
 };
 

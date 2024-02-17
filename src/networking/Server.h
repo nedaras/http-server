@@ -17,10 +17,6 @@ public:
 
 private:
 
-  void m_makeResponse(Request* request);
-
-private:
-
   std::mutex m_mutex;
 
   const std::function<void(const Request* request, Response& response)> m_callback;

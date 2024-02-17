@@ -1,5 +1,7 @@
 #include "Response.h"
 #include <cstddef>
+#include <iostream>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -47,7 +49,7 @@ void Response::write(std::string_view buffer) const // send chunked, writeData w
 
   if (buffer.size() > 0x10000) return; // sending too much, break it up
 
-  char hexBuffer[5]; // use std array
+  char hexBuffer[5];
   char* pHexBuffer = hexBuffer;
 
   std::size_t length = toHex(pHexBuffer, buffer.size());
@@ -68,7 +70,19 @@ void Response::write(std::string_view buffer) const // send chunked, writeData w
 void Response::end() const
 {
 
-  m_closed = true;
   send(m_socket, "0\r\n\r\n", 5, 0); //cool and all but when if we dont call end
+
+  epoll_event event {};
+
+  if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, m_socket, &event) == -1)
+  {
+
+    std::cout << "err in Response\n";
+
+  }
+
+  // we need to remove queue
+
+  close(m_socket);
 
 }

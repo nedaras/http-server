@@ -29,12 +29,13 @@ void Handler(const Request* request, const Response& response)
   // we can do threadpool.addTask, do saome long calculation and call inside response.end
 
   response.end(); // this should say that we ended the request.
+                  // what it would mean is that we would just reset the request object
 
 }
 
 int main()
 {
- 
+  // mb init threadpool here 
   Server server(Handler);
 
   server.listen("3000");

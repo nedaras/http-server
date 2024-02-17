@@ -1,5 +1,6 @@
 #include "Server.h"
 
+#include <iostream>
 #include <cerrno>
 #include <cstring>
 #include <unistd.h>
@@ -8,7 +9,6 @@
 #include <sys/epoll.h>
 #include <vector>
 #include "./Request.h"
-#include "../threadpool/ThreadPool.h"
 
 #define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // throwed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
 
@@ -65,7 +65,6 @@ int Server::listen(const char* port)
     return 1;
   }
 
-  ThreadPool threadPool(std::thread::hardware_concurrency());
   m_epoll = epoll_create1(0);
 
   if (m_epoll == -1)
@@ -79,7 +78,7 @@ int Server::listen(const char* port)
 
     epoll_event event;
 
-    event.events = EPOLLIN; // add et event
+    event.events = EPOLLIN | EPOLLET; 
     event.data.ptr = &m_listenSocket;
 
     if (epoll_ctl(m_epoll, EPOLL_CTL_ADD, m_listenSocket, &event) == -1)
@@ -98,9 +97,11 @@ int Server::listen(const char* port)
 
     int epolls = epoll_wait(m_epoll, m_events.data(), m_events.size(), -1);
 
+    std::cout << m_events.size() << "\n";
+
     for (int i = 0; i < epolls; i++)
     {
-     
+    
       if (!(m_events[i].events & EPOLLIN)) continue;
       if (m_events[i].data.ptr == &m_listenSocket)
       {
@@ -117,7 +118,7 @@ int Server::listen(const char* port)
 
         epoll_event event;
 
-        event.events = EPOLLIN;
+        event.events = EPOLLIN | EPOLLET; 
         event.data.ptr = request;
 
         if (epoll_ctl(m_epoll, EPOLL_CTL_ADD, clientSocket, &event) == -1)
@@ -127,7 +128,7 @@ int Server::listen(const char* port)
         }
 
         m_mutex.lock();
-        m_events.push_back({}); // cant we like have an event will trigger on epoll delete
+        m_events.push_back({});
         m_mutex.unlock(); 
 
         continue;
@@ -137,82 +138,47 @@ int Server::listen(const char* port)
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
       REQUEST_STATUS status = request->parse();
 
-      // dont put in threadpool, let user controll the flow
-      if (status == REQUEST_SUCCESS) // think how should we handle chunked encoding and stuff jeez
+      Response response(request->m_socket, m_epoll);
+
+      switch (status)
       {
-        // how will multiplexing work in these threads, if we can multiplex we dont want to hold queue
+      case REQUEST_SUCCESS:
+        m_callback(request, response);
 
-        request->m_working = true;
-        threadPool.addTask(&Server::m_makeResponse, this, request); // handle closing conection, couse now we just crashing
-  
-        continue;
+        break;
+      case REQUEST_INCOMPLETE:
+        break;
+      case REQUEST_CHUNK_ERROR:
+        std::cout << "REQUEST_CHUNK_ERROR";
+        break;
+      default:
+        epoll_event event {};
 
+        send(request->m_socket, "WTF UR DOING", 12, 0);
+
+        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
+
+        m_mutex.lock();
+        m_events.pop_back();
+        m_mutex.unlock();
+
+        close(request->m_socket);
+        delete request;
+        
+        break;
       }
-
-      epoll_event event;
-
-      event.events = EPOLLET;
-      event.data.ptr = nullptr;
-
-      send(request->getSocket(), "WTF UR DOING", 12, 0);
-
-      request->m_dead = true;
-
-      if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event) == -1)
-      {
-        PRINT_ERROR("epoll_ctl", 2);
-        continue;
-      }
-
-      close(request->getSocket());
-
-      m_mutex.lock();
-      m_events.pop_back();
-      m_mutex.unlock(); // mb we can remove those atomic vals in request and under one lock manipulate them     
-
-      if (!request->m_working) delete request;
 
     }
 
   }
-  // shut down threadpool here
-  epoll_event event;
-  
-  event.events = EPOLLET;
-  event.data.ptr = nullptr;
 
+  epoll_event event {};
+  
   if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, m_listenSocket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
 
   close(m_listenSocket);
   close(m_epoll); 
 
   return 0; 
-
-}
-
-void Server::m_makeResponse(Request* request)
-{
-
-  Response response(request->getSocket()); //handle the delition of socket in response.end
-
-  m_callback(request, response);
-
-  if (request->m_dead) { delete request; return; }
-  if (!response.m_closed) return;
-
-  epoll_event event;
-
-  event.events = EPOLLET;
-  event.data.ptr = nullptr;
-
-  if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event) == -1) PRINT_ERROR("epoll_ctl", 0);
-  
-  close(request->getSocket());
-
-  m_mutex.lock();
-  m_events.pop_back();
-  m_mutex.unlock();
-
-  delete request;
 
 }

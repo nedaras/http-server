@@ -27,11 +27,6 @@ public:
   Request(int socket);
 
   std::optional<std::string_view> getHeader(std::string_view header) const;
-  
-  int constexpr getSocket() const
-  {
-    return m_socket;
-  }
 
   REQUEST_STATUS parse();
 
@@ -41,8 +36,7 @@ private:
 
   int m_socket;
 
-  std::atomic<bool> m_dead = false;
-  std::atomic<bool> m_working = false;
+  bool m_parsed = false;
 
   http::Parser m_parser;
   
