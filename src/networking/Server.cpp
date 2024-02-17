@@ -144,10 +144,12 @@ int Server::listen(const char* port)
         m_callback(request, response);
         break;
       case REQUEST_INCOMPLETE:
+        break;
       case REQUEST_CLOSE: // if were not executing a request, just close
+        std::cout << "close\n";
         break;
       case REQUEST_CHUNK_ERROR:
-        std::cout << "REQUEST_CHUNK_ERROR";
+        std::cout << "REQUEST_CHUNK_ERROR\n";
         break;
       default:
 

@@ -1,9 +1,6 @@
 #include "networking/Server.h"
-#include <chrono>
 #include <iostream>
-#include <sys/socket.h>
 #include <thread>
-#include <unistd.h>
 
 // i think best practise is to handle non blocking io in main thread and intensive cpu work in threadpool
 
@@ -20,20 +17,26 @@ void Handler(const Request* request, const Response& response)
 
   std::cout << "Connection: " << request->getHeader("Connection").value_or("Header not found") << "\n";
 
-  std::this_thread::sleep_for(std::chrono::seconds(5));
+  // i thing request should hold response
+  std::thread([response] {
 
-  response.writeHead("Content-Type", "text/html");
-  response.writeHead("Transfer-Encoding", "chunked");
-  response.writeHead("Connection", "keep-alive");
-  
-  response.write("<!DOCTYPE html><html><head></head><body><h1>hello world</h1>");
-  response.write("<h2>this is a chunk</h2>");
-  response.write("</body></html>");
+      std::this_thread::sleep_for(std::chrono::seconds(5));
 
-  // we can do threadpool.addTask, do saome long calculation and call inside response.end
+      response.writeHead("Content-Type", "text/html");
+      response.writeHead("Transfer-Encoding", "chunked");
+      response.writeHead("Connection", "keep-alive");
 
-  response.end(); // this should say that we ended the request.
-                  // what it would mean is that we would just reset the request object
+      response.write("<!DOCTYPE html><html><head></head><body><h1>hello world</h1>");
+      response.write("<h2>this is a chunk</h2>");
+      response.write("</body></html>");
+
+      // we can do threadpool.addTask, do saome long calculation and call inside response.end
+
+      response.end(); // this should say that we ended the request.
+                      // what it would mean is that we would just reset the request object
+  }).detach(); 
+
+
 
 }
 
