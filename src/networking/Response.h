@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Request.h"
 #include <string_view>
 
 class Response
@@ -15,7 +16,7 @@ public:
 
   void writeData(std::string_view buffer) const;
 
-  void end() const;
+  void end(Request* request) const;
 
 private:
 

@@ -1,5 +1,6 @@
 #include "Response.h"
 
+#include "Request.h"
 #include "Server.h"
 #include <cstddef>
 #include <iostream>
@@ -70,7 +71,7 @@ void Response::write(std::string_view buffer) const // send chunked, writeData w
 
 }
 
-void Response::end() const
+void Response::end(Request* request) const
 {
 
   send(m_socket, "0\r\n\r\n", 5, MSG_NOSIGNAL);
@@ -91,5 +92,8 @@ void Response::end() const
   server->m_mutex.unlock();
 
   close(m_socket);
+
+  delete request; // fuck
+  server->allocated_requests--;
 
 }

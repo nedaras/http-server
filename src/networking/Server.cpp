@@ -1,5 +1,6 @@
 #include "Server.h"
 
+#include <atomic>
 #include <iostream>
 #include <cerrno>
 #include <cstring>
@@ -113,6 +114,10 @@ int Server::listen(const char* port)
         }
 
         Request* request = new Request(clientSocket); // do we need to check if ptr is nullptr?
+        
+        std::cout << "new con: " << request << "\n";
+        std::cout << "total allocations " << allocated_requests << "\n";
+        allocated_requests++;        
 
         epoll_event event;
 
@@ -165,6 +170,7 @@ int Server::listen(const char* port)
 
         close(request->m_socket);
         delete request;
+        allocated_requests--;
         
         break;
       }

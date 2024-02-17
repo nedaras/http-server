@@ -10,7 +10,7 @@
 //
 // mb make Handler func single threaded an inside we can specify if we want to throw it inside threadpool???,
 // thats has to be the best thing
-void Handler(const Request* request, const Response& response)
+void Handler(Request* request, const Response& response)
 {
   // GOAL: non blocking read chunks and write to file, meaning that we can have unlimited conections
   // GOAL: intensive CPU work for handling chunked data, meaning async io with multithreading together
@@ -18,7 +18,7 @@ void Handler(const Request* request, const Response& response)
   std::cout << "Connection: " << request->getHeader("Connection").value_or("Header not found") << "\n";
 
   // i thing request should hold response
-  std::thread([response] {
+  std::thread([request, response] {
 
       std::this_thread::sleep_for(std::chrono::seconds(5));
 
@@ -32,7 +32,7 @@ void Handler(const Request* request, const Response& response)
 
       // we can do threadpool.addTask, do saome long calculation and call inside response.end
 
-      response.end(); // this should say that we ended the request.
+      response.end(request); // this should say that we ended the request.
                       // what it would mean is that we would just reset the request object
   }).detach(); 
 
