@@ -1,6 +1,7 @@
 #include "networking/Server.h"
 #include <iostream>
 #include <sys/socket.h>
+#include <unistd.h>
 
 // i think best practise is to handle non blocking io in main thread and intensive cpu work in threadpool
 

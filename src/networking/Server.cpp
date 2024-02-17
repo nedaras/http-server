@@ -1,7 +1,6 @@
 #include "Server.h"
 
 #include <cerrno>
-#include <cstdio>
 #include <cstring>
 #include <unistd.h>
 #include <netdb.h>
@@ -21,6 +20,8 @@
 // TODO: profit
 // TODO: turn of recv travic if we aint expecting to recv
  
+// should we crash at errors?
+
 int Server::listen(const char* port)
 {
   
@@ -34,7 +35,7 @@ int Server::listen(const char* port)
 
   if (getaddrinfo(nullptr, port, &params, &result))
   {
-    PRINT_ERROR("getaddrinfo", 2);
+    PRINT_ERROR("getaddrinfo", 2); // make mby PRINT_ERRNO and PRINT_ERROR, some function will wail without setting errno
     return 1;
   }
 
@@ -43,11 +44,15 @@ int Server::listen(const char* port)
   if (m_listenSocket == -1)
   {
     PRINT_ERROR("socket", 4);
+    freeaddrinfo(result);
     return 1;
   }
 
   if (bind(m_listenSocket, result->ai_addr, result->ai_addrlen) == -1)
   {
+    PRINT_ERROR("bind", 2);
+    freeaddrinfo(result);
+    close(m_listenSocket);
     return 1;
   }
 
@@ -55,27 +60,39 @@ int Server::listen(const char* port)
 
   if (::listen(m_listenSocket, SOMAXCONN) == -1)
   {
-
+    PRINT_ERROR("listen", 2);
+    close(m_listenSocket);
     return 1;
-
   }
 
   ThreadPool threadPool(std::thread::hardware_concurrency());
   m_epoll = epoll_create1(0);
+
+  if (m_epoll == -1)
+  {
+    PRINT_ERROR("epoll_create1", 4);
+    close(m_listenSocket);
+    return 1;
+  }
   
   {
 
     epoll_event event;
 
-    event.events = EPOLLIN;
+    event.events = EPOLLIN; // add et event
     event.data.ptr = &m_listenSocket;
 
-    epoll_ctl(m_epoll, EPOLL_CTL_ADD, m_listenSocket, &event);
+    if (epoll_ctl(m_epoll, EPOLL_CTL_ADD, m_listenSocket, &event) == -1)
+    {
+      PRINT_ERROR("epoll_ctl", 2);
+      close(m_listenSocket);
+      return 1;
+    }
 
     m_events.push_back({});
   
   }
-  // where in the fuck is error handling hu? 
+
   while (true)
   {
 
@@ -88,15 +105,26 @@ int Server::listen(const char* port)
       if (m_events[i].data.ptr == &m_listenSocket)
       {
 
-        int clientSocket = accept(m_listenSocket, nullptr, nullptr);
-        Request* request = new Request(clientSocket);
+        int clientSocket = accept(m_listenSocket, nullptr, nullptr); // but these addresses in request
+
+        if (clientSocket == -1)
+        {
+          PRINT_ERROR("accept", 2);
+          continue;
+        }
+
+        Request* request = new Request(clientSocket); // do we need to check if ptr is nullptr?
 
         epoll_event event;
 
         event.events = EPOLLIN;
         event.data.ptr = request;
 
-        epoll_ctl(m_epoll, EPOLL_CTL_ADD, clientSocket, &event);
+        if (epoll_ctl(m_epoll, EPOLL_CTL_ADD, clientSocket, &event) == -1)
+        {
+          PRINT_ERROR("epoll_ctl", 2);  
+          continue;
+        }
 
         m_mutex.lock();
         m_events.push_back({}); // cant we like have an event will trigger on epoll delete
@@ -109,6 +137,7 @@ int Server::listen(const char* port)
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
       REQUEST_STATUS status = request->parse();
 
+      // dont put in threadpool, let user controll the flow
       if (status == REQUEST_SUCCESS) // think how should we handle chunked encoding and stuff jeez
       {
         // how will multiplexing work in these threads, if we can multiplex we dont want to hold queue
@@ -129,7 +158,12 @@ int Server::listen(const char* port)
 
       request->m_dead = true;
 
-      epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event);
+      if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event) == -1)
+      {
+        PRINT_ERROR("epoll_ctl", 2);
+        continue;
+      }
+
       close(request->getSocket());
 
       m_mutex.lock();
@@ -147,7 +181,7 @@ int Server::listen(const char* port)
   event.events = EPOLLET;
   event.data.ptr = nullptr;
 
-  epoll_ctl(m_epoll, EPOLL_CTL_DEL, m_listenSocket, &event);
+  if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, m_listenSocket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
 
   close(m_listenSocket);
   close(m_epoll); 
@@ -159,7 +193,7 @@ int Server::listen(const char* port)
 void Server::m_makeResponse(Request* request)
 {
 
-  Response response(request->getSocket()); //handle the delition of var in response.end
+  Response response(request->getSocket()); //handle the delition of socket in response.end
 
   m_callback(request, response);
 
@@ -171,8 +205,8 @@ void Server::m_makeResponse(Request* request)
   event.events = EPOLLET;
   event.data.ptr = nullptr;
 
-  epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event); // cant pass closed socket,
-                                                                   // btw we need state to handle keep alive
+  if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->getSocket(), &event) == -1) PRINT_ERROR("epoll_ctl", 0);
+  
   close(request->getSocket());
 
   m_mutex.lock();
