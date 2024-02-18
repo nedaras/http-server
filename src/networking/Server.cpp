@@ -12,7 +12,7 @@
 #include "./Request.h"
 #include <fcntl.h>
 
-#define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // throwed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
+#define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // trowed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
 
 // TODO: better api,
 // TODO: strict http parser

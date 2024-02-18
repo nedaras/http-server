@@ -9,10 +9,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // throwed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
+#define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // trowed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
 
 // TODO: make it work without that MSG_NOSIGNAL flag
-// TODO: some err handling for invalid sockets, yee fr couse it be crashing
 void Response::writeHead(std::string_view key, std::string_view value) const
 {
 
