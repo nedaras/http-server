@@ -52,6 +52,8 @@ void Handler(const Request* request, const Response& response)
   response.write("</body></html>");
 
   response.end();
+  
+  std::cout << "said n done\n";
 
 }
 

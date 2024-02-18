@@ -1,6 +1,5 @@
 #include "Request.h"
 
-#include <iostream>
 #include <sys/socket.h>
 
 Request::Request(int socket)
