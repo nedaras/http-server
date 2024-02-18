@@ -19,19 +19,23 @@ enum REQUEST_STATUS
   REQUEST_CHUNK_ERROR 
 };
 
-// can we make this dude hold everything
 class Request
 {
 
 public:
 
   Request(int socket);
+  Request(const Request& other) = delete;
+
+  Request& operator=(const Request& other) = delete;
 
   std::optional<std::string_view> getHeader(std::string_view header) const;
 
   std::string_view getPath() const;
 
-  REQUEST_STATUS parse();
+private:
+
+  REQUEST_STATUS m_parse();
 
 private:
 
@@ -39,15 +43,13 @@ private:
   friend class Response;
 
   std::atomic<int> m_socket;
+  http::Parser m_parser;
 
   bool m_parsed = false;
-
-  http::Parser m_parser;
   
-  constexpr static std::size_t m_bufferSize = 8 * 1024;
-  constexpr static std::size_t m_chunkSize = 1024;
+  constexpr static std::size_t m_bufferLength = 8 * 1024;
 
-  std::unique_ptr<char[]> m_buffer = std::make_unique<char[]>(m_bufferSize); // this has to be unique, aka deleted at class destructor
-  std::size_t m_bufferLength = 0; 
+  std::unique_ptr<char[]> m_buffer = std::make_unique<char[]>(m_bufferLength); // we can add one bit
+  std::size_t m_bufferSize = 0; 
 
 };

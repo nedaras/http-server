@@ -1,5 +1,6 @@
 #include "Request.h"
 
+#include <cerrno>
 #include <sys/socket.h>
 
 Request::Request(int socket)
@@ -10,34 +11,41 @@ Request::Request(int socket)
 
 }
 
-REQUEST_STATUS Request::parse() // make even more states
+REQUEST_STATUS Request::m_parse() // make even more states and rename them what are these names
 {
    
-  if (m_bufferLength + m_chunkSize > m_bufferSize) return REQUEST_HTTP_BUFFER_ERROR;
-  
-  // ok im the biggest idiot by reading this request by its chunk size,
-  // use whole buffers empty size, then if we extend to our buffer size it means request is too big
-  // so we have to close it down, so we will read till EWOULDBLOCK or if we overflow buffer
-  // if so we will break recv and send some http response otherwise if EWOULDBLOCK we will just parse the buffer
-  // and send correct status, like request incomplete or mb there was error in parsing
-
-  ssize_t bytesRead = recv(m_socket, m_buffer.get() + m_bufferLength, m_chunkSize, 0); // ok but we need to recv to know if its closed
-                                                                                       // we can add one byte for like closed if whole
-                                                                                       // buffer is taken
-  if (bytesRead == 0) return REQUEST_CLOSE;
-  if (bytesRead == -1) return REQUEST_ERROR;
-
-  if (m_parsed) return REQUEST_CHUNK_ERROR;
-
-  m_bufferLength += bytesRead;    
-
-  switch (m_parser.parse(bytesRead))
+  if (m_bufferSize >= m_bufferLength) // no way it can be bigger then length
   {
-  case 0:
-    m_parsed = true;
-    return REQUEST_SUCCESS;
-  case 1: return REQUEST_INCOMPLETE;
-  default: return REQUEST_HTTP_ERROR;
+
+    char byte;
+    ssize_t bytes = recv(m_socket, &byte, 1, 0);
+
+    return bytes == 0 ? REQUEST_CLOSE : REQUEST_HTTP_BUFFER_ERROR; // we aint checking if its -1 couse we dont care 
+
+  }
+
+  while (true)
+  {
+   
+    ssize_t bytes = recv(m_socket, m_buffer.get() + m_bufferSize, m_bufferLength - m_bufferSize, 0);
+
+    if (bytes == 0) return REQUEST_CLOSE;
+    if (bytes == -1) return errno == EWOULDBLOCK ? REQUEST_INCOMPLETE : REQUEST_ERROR;
+    
+    m_bufferSize += bytes;
+    
+    if (m_parsed) return REQUEST_CHUNK_ERROR; // i dont like this
+
+    switch (m_parser.parse(bytes))
+    {
+    case 0: // EOF REACHED
+      m_parsed = true;
+      return REQUEST_SUCCESS;
+    case 1: // EOF NOT REACHED
+      break;
+    default: return REQUEST_HTTP_ERROR;
+    }
+
   }
 
 }

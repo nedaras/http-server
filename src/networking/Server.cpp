@@ -15,16 +15,21 @@
 #define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // throwed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
 
 // TODO: better api,
-// TODO: handle errors
 // TODO: strict http parser
-// TODO: threadpoll
 // TODO: chunked data handling
 // TODO: profit
 // TODO: turn of recv travic if we aint expecting to recv
  
 // should we crash at errors?
 
-// nah bro main thrad has to handle m_events wtf
+static int setNonBlocking(int socket)
+{
+
+  int flags = fcntl(socket, F_GETFL, 0);
+  return flags ? fcntl(socket, F_SETFL, flags | O_NONBLOCK) : -1;
+
+}
+
 int Server::listen(const char* port)
 {
   
@@ -44,18 +49,18 @@ int Server::listen(const char* port)
 
   m_listenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 
-  int flags = fcntl(m_listenSocket, F_GETFL, 0);
-
-  if (flags == -1) PRINT_ERROR("a", 0); 
-
-  flags |= O_NONBLOCK;
-
-  if (fcntl(m_listenSocket, F_SETFL, flags) == -1) PRINT_ERROR("fcntl", 0);
-
   if (m_listenSocket == -1)
   {
     PRINT_ERROR("socket", 4);
     freeaddrinfo(result);
+    return 1;
+  }
+
+  if (setNonBlocking(m_listenSocket) == -1)
+  {
+    PRINT_ERROR("setNonBlocking", 2);
+    freeaddrinfo(result);
+    close(m_listenSocket);
     return 1;
   }
 
@@ -128,7 +133,7 @@ int Server::listen(const char* port)
       if (!(m_events[i].events & EPOLLIN)) continue;
       if (m_events[i].data.ptr == &m_listenSocket)
       {
-        
+
         while (true)
         {
 
@@ -136,26 +141,23 @@ int Server::listen(const char* port)
 
           if (clientSocket == -1)
           {
-
-            if (errno == EWOULDBLOCK) break;
-
-            PRINT_ERROR("accept", 7);
+            if (errno != EWOULDBLOCK) PRINT_ERROR("accept", 4);
             break;
           }
 
-          int flags = fcntl(clientSocket, F_GETFL, 0);
-
-          if (flags == -1) PRINT_ERROR("a", 0); 
-
-          flags |= O_NONBLOCK;
-
-          if (fcntl(clientSocket, F_SETFL, flags) == -1) PRINT_ERROR("fcntl", 0);
+          if (setNonBlocking(clientSocket) == -1)
+          {
+            PRINT_ERROR("setNonBlocking", 2);
+            close(clientSocket);
+            break;
+          }
 
           Request* request = new Request(clientSocket); // do we need to check if ptr is nullptr?
 
-          if (request == nullptr)
+          if (request == nullptr) // if this happens just close program
           {
             std::cout << "nullptr request\n";
+            close(clientSocket);
             break;
           }
 
@@ -163,15 +165,18 @@ int Server::listen(const char* port)
 
           event.events = EPOLLIN | EPOLLET; 
           event.data.ptr = request;
+
           if (epoll_ctl(m_epoll, EPOLL_CTL_ADD, clientSocket, &event) == -1)
           {
-            PRINT_ERROR("epoll_ctl", 2);  
+            PRINT_ERROR("epoll_ctl", 2);
+            close(clientSocket);
             break;
           }
 
           lock.lock();
           m_events.push_back({});
-          lock.unlock(); 
+          lock.unlock();
+
         }
 
         continue;
@@ -179,7 +184,7 @@ int Server::listen(const char* port)
       }
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
-      REQUEST_STATUS status = request->parse(); // we should exit till we reach that EWOULDBLOCK state
+      REQUEST_STATUS status = request->m_parse();
             
       epoll_event event {};
       

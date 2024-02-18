@@ -4,8 +4,6 @@
 
 // i think best practise is to handle non blocking io in main thread and intensive cpu work in threadpool
 
-static int req = 0;
-
 // so this is intensive cpu but we can like add request.onData and do dome stuff im main thread
 //
 // mb make Handler func single threaded an inside we can specify if we want to throw it inside threadpool???,
@@ -15,8 +13,6 @@ void Handler(const Request* request, const Response& response)
   // GOAL: non blocking read chunks and write to file, meaning that we can have unlimited conections
   // GOAL: intensive CPU work for handling chunked data, meaning async io with multithreading together
   
-  req++;
-
   std::cout << request->getPath() << "\n";
 
   if (request->getPath() == "/long")
@@ -52,8 +48,6 @@ void Handler(const Request* request, const Response& response)
   response.write("</body></html>");
 
   response.end();
-  
-  std::cout << "said n done\n";
 
 }
 
