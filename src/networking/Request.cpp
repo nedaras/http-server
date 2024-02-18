@@ -14,6 +14,12 @@ REQUEST_STATUS Request::parse() // make even more states
 {
    
   if (m_bufferLength + m_chunkSize > m_bufferSize) return REQUEST_HTTP_BUFFER_ERROR;
+  
+  // ok im the biggest idiot by reading this request by its chunk size,
+  // use whole buffers empty size, then if we extend to our buffer size it means request is too big
+  // so we have to close it down, so we will read till EWOULDBLOCK or if we overflow buffer
+  // if so we will break recv and send some http response otherwise if EWOULDBLOCK we will just parse the buffer
+  // and send correct status, like request incomplete or mb there was error in parsing
 
   ssize_t bytesRead = recv(m_socket, m_buffer.get() + m_bufferLength, m_chunkSize, 0); // ok but we need to recv to know if its closed
                                                                                        // we can add one byte for like closed if whole
