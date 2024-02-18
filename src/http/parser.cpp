@@ -73,7 +73,6 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
  
   while (m_buffer != end)
   {
-  
     switch (m_state)
     {
     case REQUEST_METHOD:

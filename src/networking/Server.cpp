@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cerrno>
 #include <cstring>
+#include <mutex>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -22,6 +23,8 @@
  
 // should we crash at errors?
 
+
+// nah bro main thrad has to handle m_events wtf
 int Server::listen(const char* port)
 {
   
@@ -78,7 +81,7 @@ int Server::listen(const char* port)
 
     epoll_event event;
 
-    event.events = EPOLLIN | EPOLLET; 
+    event.events = EPOLLIN;
     event.data.ptr = &m_listenSocket;
 
     if (epoll_ctl(m_epoll, EPOLL_CTL_ADD, m_listenSocket, &event) == -1)
@@ -95,11 +98,18 @@ int Server::listen(const char* port)
   while (true)
   {
 
-    int epolls = epoll_wait(m_epoll, m_events.data(), m_events.size(), -1);
+    std::unique_lock<std::mutex> lock(m_mutex);
+
+    epoll_event* events = m_events.data();
+    std::size_t eventSize = m_events.size();
+
+    lock.unlock();
+
+    int epolls = epoll_wait(m_epoll, events, eventSize, -1); // o kurwa
 
     for (int i = 0; i < epolls; i++)
     {
-    
+   
       if (!(m_events[i].events & EPOLLIN)) continue;
       if (m_events[i].data.ptr == &m_listenSocket)
       {
@@ -115,33 +125,30 @@ int Server::listen(const char* port)
         Request* request = new Request(clientSocket); // do we need to check if ptr is nullptr?
         
         if (request == nullptr) std::cout << "nullptr request\n";                                              
-
+        
         epoll_event event;
 
-        event.events = EPOLLIN | EPOLLET; 
+        event.events = EPOLLIN; 
         event.data.ptr = request;
-
         if (epoll_ctl(m_epoll, EPOLL_CTL_ADD, clientSocket, &event) == -1)
         {
           PRINT_ERROR("epoll_ctl", 2);  
           continue;
         }
 
-        m_mutex.lock();
+        lock.lock();
         m_events.push_back({});
-        m_mutex.unlock(); 
+        lock.unlock(); 
 
         continue;
 
       }
 
-      std::cout << "new read" << "\n";
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
       REQUEST_STATUS status = request->parse();
-      
+            
       epoll_event event {};
       
-
       switch (status)
       {
       case REQUEST_SUCCESS:
@@ -153,9 +160,9 @@ int Server::listen(const char* port)
 
         if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
 
-        m_mutex.lock();
+        lock.lock();
         m_events.pop_back();
-        m_mutex.unlock();
+        lock.unlock();
 
         close(request->m_socket);
         request->m_socket = 0;
@@ -171,9 +178,9 @@ int Server::listen(const char* port)
 
         if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
 
-        m_mutex.lock();
+        lock.lock();
         m_events.pop_back();
-        m_mutex.unlock();
+        lock.unlock();
 
         close(request->m_socket);
         delete request;
