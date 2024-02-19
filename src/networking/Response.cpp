@@ -1,10 +1,8 @@
 #include "Response.h"
 
 #include "Request.h"
-#include "Server.h"
 #include <cstddef>
 #include <cstring>
-#include <iostream>
 #include <string>
 #include <sys/epoll.h>
 #include <sys/socket.h>

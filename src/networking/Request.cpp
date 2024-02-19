@@ -8,11 +8,19 @@ Request::Request(int socket)
 {
 
   m_socket = socket;
-  m_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) + std::chrono::seconds(5);
-
   m_parser = http::Parser(m_buffer.get());
 
+  updateTimeout(5000);
+
 }
+
+void Request::updateTimeout(unsigned long milliseconds)
+{
+
+  m_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) + std::chrono::milliseconds(milliseconds);
+
+}
+
 // habdle http 1.1 chunks and other http requests.
 REQUEST_STATUS Request::m_parse() // make even more states and rename them what are these names
 {

@@ -34,6 +34,8 @@ public:
 
   std::string_view getPath() const;
 
+  void updateTimeout(unsigned long milliseconds);
+
 private:
 
   REQUEST_STATUS m_parse();
