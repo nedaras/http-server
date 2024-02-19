@@ -1,6 +1,7 @@
 #include "Request.h"
 
 #include <cerrno>
+#include <iostream>
 #include <sys/socket.h>
 
 Request::Request(int socket)
@@ -28,18 +29,23 @@ REQUEST_STATUS Request::m_parse() // make even more states and rename them what 
   {
    
     ssize_t bytes = recv(m_socket, m_buffer.get() + m_bufferSize, m_bufferLength - m_bufferSize, 0);
-
+    
     if (bytes == 0) return REQUEST_CLOSE;
     if (bytes == -1) return errno == EWOULDBLOCK ? REQUEST_INCOMPLETE : REQUEST_ERROR;
     
     m_bufferSize += bytes;
-    
-    if (m_parsed) return REQUEST_CHUNK_ERROR; // i dont like this
+
+    //if (m_parsed) return REQUEST_CHUNK_ERROR; // i dont like this
 
     switch (m_parser.parse(bytes))
     {
     case 0: // EOF REACHED
-      m_parsed = true;
+      //m_parsed = true;
+      
+      m_path = m_parser.path;
+
+      m_parser = http::Parser(m_buffer.get()); // overide it on new req
+      m_bufferSize = 0;
       return REQUEST_SUCCESS;
     case 1: // EOF NOT REACHED
       break;
@@ -67,6 +73,6 @@ std::optional<std::string_view> Request::getHeader(std::string_view header) cons
 std::string_view Request::getPath() const
 {
 
-  return m_parser.path;
+  return m_path;
 
 }

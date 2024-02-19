@@ -36,7 +36,7 @@ public:
 
 private:
 
-  enum STATE : char
+  enum STATE
   {
     REQUEST_METHOD,
     REQUEST_PATH_BEGIN,

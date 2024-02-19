@@ -1,6 +1,5 @@
 #include "networking/Server.h"
 #include <iostream>
-#include <thread>
 
 // i think best practise is to handle non blocking io in main thread and intensive cpu work in threadpool
 
@@ -14,6 +13,18 @@ void Handler(const Request* request, const Response& response)
   // GOAL: intensive CPU work for handling chunked data, meaning async io with multithreading together
   
   std::cout << request->getPath() << "\n";
+
+  if (request->getPath() == "/favicon.ico")
+  {
+
+    response.writeHead("Content-Type", "text/html");
+    response.writeHead("Connection", "close");
+
+    response.writeBody("no fav icon."); 
+
+    response.end();
+
+  }
 
   if (request->getPath() == "/css/style.css")
   {
@@ -33,7 +44,7 @@ void Handler(const Request* request, const Response& response)
   response.writeHead("Connection", "keep-alive");
   response.writeHead("Transfer-Encoding", "chunked");
 
-  response.write("<!DOCTYPE html><html><head><link rel='stylesheet' href='/css/style.css'></head><body><h1>hello world</h1>");
+  response.write("<!DOCTYPE html><html><head><link rel='stylesheet' href='./css/style.css'></head><body><h1>hello world</h1>");
   response.write("<h2>this is a chunk</h2>");
   response.write("</body></html>");
 

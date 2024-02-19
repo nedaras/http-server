@@ -104,18 +104,18 @@ void Response::end() const
 
   if (m_chunkSent) send(m_request->m_socket, "0\r\n\r\n", 5, 0);
 
-  epoll_event event {};
+  //epoll_event event {};
   
-  Server* server = static_cast<Server*>(m_server);
+  //Server* server = static_cast<Server*>(m_server);
   
-  if (epoll_ctl(server->m_epoll, EPOLL_CTL_DEL, m_request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
+  //if (epoll_ctl(server->m_epoll, EPOLL_CTL_DEL, m_request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
 
-  server->m_mutex.lock();
-  server->m_events.pop_back();
-  server->m_mutex.unlock();
+  //server->m_mutex.lock();
+  //server->m_events.pop_back();
+  //server->m_mutex.unlock();
 
-  close(m_request->m_socket);
+  //close(m_request->m_socket);
 
-  delete m_request;
+  //delete m_request;
 
 }

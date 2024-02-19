@@ -187,7 +187,7 @@ int Server::listen(const char* port)
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
       REQUEST_STATUS status = request->m_parse(); // lets make this http 1.1, it means that we handle chunks and other http requests
-            
+
       epoll_event event {};
       
       switch (status)
@@ -209,7 +209,7 @@ int Server::listen(const char* port)
         close(request->m_socket);
         request->m_socket = 0;
 
-        if (!request->m_parsed) 
+        if (!request->m_parsed)
         {
           delete request;
         }

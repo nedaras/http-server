@@ -47,6 +47,8 @@ private:
 
   bool m_parsed = false;
   
+  std::string_view m_path;
+
   constexpr static std::size_t m_bufferLength = 8 * 1024;
 
   std::unique_ptr<char[]> m_buffer = std::make_unique<char[]>(m_bufferLength); // we can add one bit
