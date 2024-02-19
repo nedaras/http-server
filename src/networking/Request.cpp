@@ -10,7 +10,7 @@ Request::Request(int socket)
   m_parser = http::Parser(m_buffer.get());
 
 }
-
+// habdle http 1.1 chunks and other http requests.
 REQUEST_STATUS Request::m_parse() // make even more states and rename them what are these names
 {
    

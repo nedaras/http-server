@@ -173,6 +173,8 @@ int Server::listen(const char* port)
             break;
           }
 
+          std::cout << "new req\n";
+
           lock.lock();
           m_events.push_back({});
           lock.unlock();
@@ -184,7 +186,7 @@ int Server::listen(const char* port)
       }
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
-      REQUEST_STATUS status = request->m_parse();
+      REQUEST_STATUS status = request->m_parse(); // lets make this http 1.1, it means that we handle chunks and other http requests
             
       epoll_event event {};
       

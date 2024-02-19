@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstring>
 #include <iostream>
+#include <string>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -19,14 +20,14 @@ void Response::writeHead(std::string_view key, std::string_view value) const
 
   if (!m_headSent)
   {
-    send(m_request->m_socket, "HTTP/1.1 200 OK\r\n", 16, MSG_NOSIGNAL);
+    send(m_request->m_socket, "HTTP/1.1 200 OK\r\n", 17, 0);
     m_headSent = true;
   }
 
-  send(m_request->m_socket, key.data(), key.size(), MSG_NOSIGNAL);
-  send(m_request->m_socket, ": ", 2, MSG_NOSIGNAL);
-  send(m_request->m_socket, value.data(), value.size(), MSG_NOSIGNAL);
-  send(m_request->m_socket, "\r\n", 2, MSG_NOSIGNAL);
+  send(m_request->m_socket, key.data(), key.size(), 0);
+  send(m_request->m_socket, ": ", 2, 0);
+  send(m_request->m_socket, value.data(), value.size(), 0);
+  send(m_request->m_socket, "\r\n", 2, 0);
 
 }
 
@@ -78,6 +79,20 @@ void Response::write(std::string_view buffer) const // send chunked, writeData w
 
 }
 
+void Response::writeBody(std::string_view buffer) const
+{
+
+  if (!m_contentLengthSent)
+  {
+    writeHead("Content-Length", std::to_string(buffer.size()));
+    m_contentLengthSent = true;
+  }
+  
+  send(m_request->m_socket, "\r\n", 2, 0);
+  send(m_request->m_socket, buffer.data(), buffer.size(), 0);
+
+}
+
 void Response::end() const
 {
 
@@ -87,7 +102,7 @@ void Response::end() const
     return;
   }
 
-  send(m_request->m_socket, "0\r\n\r\n", 5, MSG_NOSIGNAL);
+  if (m_chunkSent) send(m_request->m_socket, "0\r\n\r\n", 5, 0);
 
   epoll_event event {};
   

@@ -15,7 +15,7 @@ public:
 
   void write(std::string_view buffer) const;
 
-  void writeData(std::string_view buffer) const;
+  void writeBody(std::string_view buffer) const;
 
   void end() const;
 
@@ -28,6 +28,7 @@ private:
 
   mutable bool m_headSent = false;
   mutable bool m_chunkSent = false;
+  mutable bool m_contentLengthSent = false;
 
 };
 
