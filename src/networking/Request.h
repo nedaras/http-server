@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -43,6 +44,8 @@ private:
   friend class Response;
 
   std::atomic<int> m_socket;
+  std::chrono::milliseconds m_timeout; 
+
   http::Parser m_parser;
 
   bool m_parsed = false;

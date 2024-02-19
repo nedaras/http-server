@@ -1,9 +1,12 @@
 #include "Server.h"
 
+#include <chrono>
+#include <ctime>
 #include <iostream>
 #include <cerrno>
 #include <cstring>
 #include <mutex>
+#include <queue>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -81,6 +84,7 @@ int Server::listen(const char* port)
     return 1;
   }
 
+
   m_epoll = epoll_create1(0);
 
   if (m_epoll == -1)
@@ -108,6 +112,9 @@ int Server::listen(const char* port)
   
   }
 
+  // we sill use some tipe of min heap
+  std::queue<Request*> timeouts;
+
   while (true)
   {
 
@@ -118,7 +125,46 @@ int Server::listen(const char* port)
 
     lock.unlock();
 
-    int epolls = epoll_wait(m_epoll, events, eventSize, -1); // o kurwa
+    int timeout = -1;
+
+    if (!timeouts.empty())
+    {
+
+      Request* request = timeouts.front();
+
+      timeout = (request->m_timeout - std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())).count();
+
+      std::cout << "m_timeout: " << request->m_timeout.count() << "\n";
+      std::cout << "timeout: " << timeout << "\n"; // check if timeout is less then 0, like while loop till we hit a timeout which is more then zero
+
+    }
+
+    int epolls = epoll_wait(m_epoll, events, eventSize, timeout);
+
+    std::cout << "epolls: " << epolls << "\n";
+
+    if (epolls == 0)
+    {
+      
+      Request* request = timeouts.back();
+ 
+      epoll_event event {};
+
+      if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
+
+      lock.lock();
+      m_events.pop_back();
+      lock.unlock();
+
+      close(request->m_socket);
+
+      delete request;
+
+      timeouts.pop();
+
+      continue;
+
+    }
 
     for (int i = 0; i < epolls; i++)
     {
@@ -177,6 +223,7 @@ int Server::listen(const char* port)
 
           lock.lock();
           m_events.push_back({});
+          timeouts.push(request);
           lock.unlock();
 
         }
@@ -199,7 +246,7 @@ int Server::listen(const char* port)
         std::cout << "ayaya cocojumpo\n";
         break;
       case REQUEST_CLOSE:
-
+        std::cout << "REQUEST_CLOSE\n";
         if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
 
         lock.lock();
@@ -219,7 +266,7 @@ int Server::listen(const char* port)
         std::cout << "REQUEST_CHUNK_ERROR\n";
         break;
       default:
-
+        std::cout << "SOME_REQUEST_ERROR\n";
         if (status == REQUEST_ERROR) PRINT_ERROR("Request::parse", 33);
 
         send(request->m_socket, "WTF UR DOING", 12, 0); // send some http response

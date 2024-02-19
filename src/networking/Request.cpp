@@ -1,13 +1,15 @@
 #include "Request.h"
 
 #include <cerrno>
-#include <iostream>
+#include <chrono>
 #include <sys/socket.h>
 
 Request::Request(int socket)
 {
 
   m_socket = socket;
+  m_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) + std::chrono::seconds(5);
+
   m_parser = http::Parser(m_buffer.get());
 
 }
