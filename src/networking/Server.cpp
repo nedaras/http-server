@@ -254,6 +254,35 @@ int Server::listen(const char* port)
 
         m_callback(request, Response(request, this));
 
+        
+
+        { // deleting element, u dont even know how much i hate this
+
+          std::vector<Request*> temp;
+
+          while (!m_timeouts.empty())
+          {
+           
+            if (m_timeouts.top() == request)
+            {
+
+              m_timeouts.pop();
+              break;
+
+            }
+            
+            temp.push_back(m_timeouts.top());
+            m_timeouts.pop();
+
+          }
+          
+          for (Request* element : temp) m_timeouts.push(element);
+
+        }
+
+        request->updateTimeout(5000);
+        m_timeouts.push(request);
+
         break;
       case REQUEST_INCOMPLETE:
         std::cout << "ayaya cocojumpo\n";
@@ -264,7 +293,31 @@ int Server::listen(const char* port)
 
         lock.lock();
         m_events.pop_back();
-        // some how fuckind update priority queue
+
+        { // deleting element
+
+          std::vector<Request*> temp;
+
+          while (!m_timeouts.empty())
+          {
+           
+            if (m_timeouts.top() == request)
+            {
+
+              m_timeouts.pop();
+              break;
+
+            }
+            
+            temp.push_back(m_timeouts.top());
+            m_timeouts.pop();
+
+          }
+          
+          for (Request* element : temp) m_timeouts.push(element);
+
+        }
+
         lock.unlock();
 
         close(request->m_socket);
