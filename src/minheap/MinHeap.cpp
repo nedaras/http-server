@@ -1,6 +1,6 @@
 #include "MinHeap.h"
+#include <algorithm>
 #include <cstddef>
-#include <iostream>
 #include <utility>
 
 void MinHeap::push(int value)
@@ -14,40 +14,50 @@ void MinHeap::push(int value)
   }
 
   m_vector[++m_size] = value;
+
+  m_indices[value].insert(m_size);
   m_shiftUp(m_size);
 
 }
 
-void MinHeap::pop()
+void MinHeap::pop() 
 {
+  
+  m_indices.at(m_vector[1]).erase(1);
+
+  if (m_indices.at(m_vector[1]).empty()) m_indices.erase(m_vector[1]);
+
+  if (m_size != 1)
+  {
+    m_indices.at(m_vector[m_size]).erase(m_size);
+    m_indices.at(m_vector[m_size]).insert(1);
+  }
 
   std::swap(m_vector[1], m_vector[m_size--]);
   m_shiftDown(1);
 
 }
 
-void MinHeap::erase(int value) // O(n)
+void MinHeap::erase(int value)
 {
 
-  for (std::size_t i = 1; i <= m_size; i++)
+  std::size_t i = *m_indices.at(value).begin();
+
+  std::swap(m_vector[i], m_vector[m_size--]);
+
+  if (i != 1 && m_vector[i] < m_vector[m_getParent(i)]) // i != 1 can be removed cause parent will point to i
   {
 
-    if (m_vector[i] == value)
-    {
-
-      std::swap(m_vector[i], m_vector[m_size--]);
-      m_shiftDown(i);
-
-      break;
-
-    }
+    m_shiftUp(i);
+    return;
 
   }
 
+  m_shiftDown(i);
 
 }
 
-void MinHeap::m_shiftUp(std::size_t i) // if future we will need to remove recursion
+void MinHeap::m_shiftUp(std::size_t i) // in future we will need to remove recursion
 {
 
   if (i > m_size) return;
@@ -56,7 +66,19 @@ void MinHeap::m_shiftUp(std::size_t i) // if future we will need to remove recur
   if (m_vector[i] < m_vector[m_getParent(i)])
   {
 
+    // is there no better way to swap it?
+
+    std::size_t a = m_getParent(i);
+    std::size_t b = i;
+
+    m_indices.at(m_vector[a]).erase(a);
+    m_indices.at(m_vector[a]).insert(b);
+
+    m_indices.at(m_vector[b]).erase(b);
+    m_indices.at(m_vector[b]).insert(a);
+
     std::swap(m_vector[m_getParent(i)], m_vector[i]);
+
     m_shiftUp(m_getParent(i));
 
   }
@@ -75,8 +97,25 @@ void MinHeap::m_shiftDown(std::size_t i) // implement this using while loop
 
   if (swapId == i) return;
 
+  std::size_t a = i;
+  std::size_t b = swapId;
+
+  m_indices.at(m_vector[a]).erase(a);
+  m_indices.at(m_vector[a]).insert(b);
+
+  m_indices.at(m_vector[b]).erase(b);
+  m_indices.at(m_vector[b]).insert(a);
+
   std::swap(m_vector[i], m_vector[swapId]);
 
   m_shiftDown(swapId);
+
+}
+
+
+void MinHeap::m_swap(int& a, int& b)
+{
+
+  std::swap(a, b);
 
 }

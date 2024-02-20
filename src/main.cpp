@@ -69,6 +69,12 @@ int main()
   heap.erase(69);
   heap.erase(-2);
 
+  heap.erase(5000);
+  heap.erase(1);
+
+  heap.push(69);
+  heap.push(1);
+
   while (!heap.isEmpty())
   {
 

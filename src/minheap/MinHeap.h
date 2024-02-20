@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cstddef>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 class MinHeap
@@ -48,10 +48,12 @@ private:
     return m_getLeft(i) + 1;
   }
 
+  void m_swap(int& a, int& b);
+
 private:
 
   std::vector<int> m_vector = { 0 }; // first garbage value becouse we need to be able to bit shift
-  std::unordered_map<int, std::size_t> entries;
+  std::unordered_map<int, std::unordered_set<std::size_t>> m_indices;
 
   std::size_t m_size = 0;
 
