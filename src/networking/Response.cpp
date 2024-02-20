@@ -7,6 +7,7 @@
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include "Server.h"
 
 #define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // trowed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
 
@@ -66,14 +67,14 @@ void Response::write(std::string_view buffer) const // send chunked, writeData w
   
   if (!m_chunkSent)
   {
-    send(m_request->m_socket, "\r\n", 2, MSG_NOSIGNAL);
+    send(m_request->m_socket, "\r\n", 2, 0);
     m_chunkSent = true;
   }
 
-  send(m_request->m_socket, pHexBuffer, length, MSG_NOSIGNAL); 
-  send(m_request->m_socket, "\r\n", 2, MSG_NOSIGNAL);
-  send(m_request->m_socket, buffer.data(), buffer.size(), MSG_NOSIGNAL);
-  send(m_request->m_socket, "\r\n", 2, MSG_NOSIGNAL);
+  send(m_request->m_socket, pHexBuffer, length, 0); 
+  send(m_request->m_socket, "\r\n", 2, 0);
+  send(m_request->m_socket, buffer.data(), buffer.size(), 0);
+  send(m_request->m_socket, "\r\n", 2, 0);
 
 }
 
@@ -96,24 +97,16 @@ void Response::end() const
 
   if (m_request->m_socket == 0)
   {
-    delete m_request;
+    m_server->removeRequest(m_request);
     return;
   }
 
   if (m_chunkSent) send(m_request->m_socket, "0\r\n\r\n", 5, 0);
 
-  //epoll_event event {};
-  
-  //Server* server = static_cast<Server*>(m_server);
-  
-  //if (epoll_ctl(server->m_epoll, EPOLL_CTL_DEL, m_request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
+  m_request->updateTimeout(5000);
 
-  //server->m_mutex.lock();
-  //server->m_events.pop_back();
-  //server->m_mutex.unlock();
-
-  //close(m_request->m_socket);
-
-  //delete m_request;
+  m_server->m_mutex.lock();
+  m_server->m_timeouts.push({ m_request, m_request->m_timeout }); 
+  m_server->m_mutex.unlock();
 
 }

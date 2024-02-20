@@ -1,5 +1,6 @@
 #include "networking/Server.h"
 #include <iostream>
+#include "minheap/MinHeap.h"
 
 // i think best practise is to handle non blocking io in main thread and intensive cpu work in threadpool
 
@@ -55,6 +56,30 @@ void Handler(const Request* request, const Response& response)
 int main()
 {
   // mb init threadpool here 
+ 
+  MinHeap heap;
+
+  heap.push(69);
+  heap.push(100);
+  heap.push(1);
+  heap.push(5000);
+  heap.push(-2);
+  heap.push(69);
+
+  while (!heap.isEmpty())
+  {
+
+    int val = heap.top();
+
+    std::cout << val << "\n";
+
+    heap.pop();
+
+  }
+
+  return 0;
+
+
   Server server(Handler);
 
   server.listen("3000");

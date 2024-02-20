@@ -1,20 +1,16 @@
 #include "Server.h"
 
-#include <asm-generic/socket.h>
-#include <bits/types/struct_timeval.h>
+#include "./Request.h"
 #include <chrono>
-#include <ctime>
 #include <iostream>
 #include <cerrno>
 #include <cstring>
 #include <mutex>
-#include <queue>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
 #include <vector>
-#include "./Request.h"
 #include <fcntl.h>
 
 #define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // trowed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
@@ -51,6 +47,7 @@ void Server::removeRequest(Request* request)
   delete request;
 
 }
+
 int Server::listen(const char* port) 
 {
   
@@ -130,22 +127,17 @@ int Server::listen(const char* port)
   
   }
 
-
   while (true)
   {
 
+    long timeout = -1;
+
     std::unique_lock<std::mutex> lock(m_mutex);
 
-    epoll_event* events = m_events.data();
-    std::size_t eventSize = m_events.size();
-
-    lock.unlock();
-
-    long timeout = -1;
-    
-    while (!m_timeouts.empty())
+    // this is shit couse we can double free
+    while (!m_timeouts.empty()) // this is so bad bad bad, we need priority queue with atleast O(log n) deletion time complexity
     {
-     
+
       Timeout m_timeout = m_timeouts.front();
       std::chrono::milliseconds now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
 
@@ -171,7 +163,10 @@ int Server::listen(const char* port)
 
     }
 
-    std::cout << timeout << "\n";
+    epoll_event* events = m_events.data();
+    std::size_t eventSize = m_events.size();
+
+    lock.unlock();
 
     int epolls = epoll_wait(m_epoll, events, eventSize, timeout);
 
@@ -189,7 +184,11 @@ int Server::listen(const char* port)
       if (m_events[i].events & EPOLLERR || m_events[i].events & EPOLLHUP)
       {
 
-        std::cout << "errrrroroorororo\n"; // i never got an error i rly dont even know how should i handle them
+        if (m_events[i].data.ptr == &m_listenSocket) continue;
+
+        Request* request = static_cast<Request*>(m_events[i].data.ptr);
+
+        removeRequest(request);
 
       }
 
@@ -215,7 +214,7 @@ int Server::listen(const char* port)
             break;
           }
           
-          Request* request = new Request(clientSocket); // do we need to check if ptr is nullptr?
+          Request* request = new Request(clientSocket);
 
           if (request == nullptr) // if this happens just close program
           {
@@ -250,17 +249,10 @@ int Server::listen(const char* port)
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
       REQUEST_STATUS status = request->m_parse(); // lets make this http 1.1, it means that we handle chunks and other http requests
 
-      epoll_event event {};
-      
       switch (status)
       {
       case REQUEST_SUCCESS:
-
         m_callback(request, Response(request, this));
-
-        request->updateTimeout(5000);
-        m_timeouts.push({ request, request->m_timeout });
-
         break;
       case REQUEST_INCOMPLETE: // dont push to timeout
         break;
@@ -273,8 +265,8 @@ int Server::listen(const char* port)
       case REQUEST_CHUNK_ERROR: // timeout should habdling it, but its not so great, we should atleast remove it from event list
         break;
       default:
-        if (status == REQUEST_ERROR) PRINT_ERROR("Request::parse", 33);
 
+        if (status == REQUEST_ERROR) PRINT_ERROR("Request::parse", 33);
         if (request->m_parsed) break;
 
         send(request->m_socket, "WTF UR DOING", 12, 0); // send some http response
