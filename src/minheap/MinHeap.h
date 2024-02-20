@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <unordered_map>
 #include <vector>
 
 class MinHeap
@@ -23,6 +24,8 @@ public:
   void push(int value);
 
   void pop();
+
+  void erase(int val);
 
 private:
 
@@ -47,7 +50,9 @@ private:
 
 private:
 
-  std::vector<int> m_vector = { -1 };
+  std::vector<int> m_vector = { 0 }; // first garbage value becouse we need to be able to bit shift
+  std::unordered_map<int, std::size_t> entries;
+
   std::size_t m_size = 0;
 
 };

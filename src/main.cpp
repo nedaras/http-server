@@ -66,11 +66,14 @@ int main()
   heap.push(-2);
   heap.push(69);
 
+  heap.erase(69);
+  heap.erase(-2);
+
   while (!heap.isEmpty())
   {
 
     int val = heap.top();
-
+     
     std::cout << val << "\n";
 
     heap.pop();
