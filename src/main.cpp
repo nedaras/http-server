@@ -18,7 +18,7 @@ void Handler(const Request* request, const Response& response)
   {
 
     response.writeHead("Content-Type", "text/html");
-    response.writeHead("Connection", "close");
+    response.writeHead("Connection", "keep-alive");
 
     response.writeBody("no fav icon."); 
 
