@@ -265,23 +265,22 @@ int Server::listen(const char* port)
       case REQUEST_INCOMPLETE: // dont push to timeout
         break;
       case REQUEST_CLOSE: // we should close it if its aint in timeouts
+        if (request->m_parsed) break;
+
+        removeRequest(request);
+
         break;
       case REQUEST_CHUNK_ERROR: // timeout should habdling it, but its not so great, we should atleast remove it from event list
         break;
       default:
         if (status == REQUEST_ERROR) PRINT_ERROR("Request::parse", 33);
 
+        if (request->m_parsed) break;
+
         send(request->m_socket, "WTF UR DOING", 12, 0); // send some http response
 
-        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
-
-        lock.lock();
-        m_events.pop_back();
-        lock.unlock();
-
-        close(request->m_socket);
-        delete request;
-        
+        removeRequest(request);
+                
         break;
       }
 

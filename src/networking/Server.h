@@ -37,7 +37,7 @@ private:
   const std::function<void(const Request* request, const Response& response)> m_callback;
 
   std::vector<epoll_event> m_events;
-  std::queue<Timeout> m_timeouts;
+  std::queue<Timeout> m_timeouts; // yeye for only http 1.1 we will use priority queue
 
   int m_listenSocket;
   int m_epoll;
