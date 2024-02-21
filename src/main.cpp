@@ -57,8 +57,9 @@ int main()
 {
   // mb init threadpool here 
  
-  MinHeap heap;
+  MinHeap<int> heap;
 
+  heap.push(-13);
   heap.push(69);
   heap.push(100);
   heap.push(1);
@@ -75,7 +76,8 @@ int main()
   heap.push(69);
   heap.push(1);
 
-  while (!heap.isEmpty())
+
+  while (!heap.empty())
   {
 
     int val = heap.top();
