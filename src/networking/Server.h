@@ -2,6 +2,7 @@
 
 #include "Request.h"
 #include "Response.h"
+#include "../minheap/MinHeap.h"
 #include <chrono>
 #include <functional>
 #include <mutex>
@@ -24,20 +25,24 @@ private:
 
 private:
 
-  struct Timeout
-  {
-    Request* request;
-    std::chrono::milliseconds timeout;
-  };
-
   friend class Response;
 
   std::mutex m_mutex;
 
   const std::function<void(const Request* request, const Response& response)> m_callback;
 
+  struct CompareRequests
+  {
+
+    bool operator()(Request* left, Request* right)
+    {
+      return left > right;
+    }
+
+  };
+
   std::vector<epoll_event> m_events;
-  std::queue<Timeout> m_timeouts; // yeye for only http 1.1 we will use priority queue
+  MinHeap<Request*, CompareRequests> m_timeouts;
 
   int m_listenSocket;
   int m_epoll;

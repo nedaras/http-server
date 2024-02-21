@@ -99,7 +99,6 @@ int Server::listen(const char* port)
     return 1;
   }
 
-
   m_epoll = epoll_create1(0);
 
   if (m_epoll == -1)
@@ -130,41 +129,35 @@ int Server::listen(const char* port)
   while (true)
   {
 
-    long timeout = -1;
+    std::chrono::milliseconds::rep timeout = -1;
 
     std::unique_lock<std::mutex> lock(m_mutex);
 
-    // this is shit couse we can double free
-    while (!m_timeouts.empty()) // this is so bad bad bad, we need priority queue with atleast O(log n) deletion time complexity
+    while (!m_timeouts.empty())
     {
 
-      Timeout m_timeout = m_timeouts.front();
+      Request* request = m_timeouts.top();
       std::chrono::milliseconds now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
 
-      if (now > m_timeout.timeout)
+      if (now > request->m_timeout)
       {
 
-        if (m_timeout.timeout == m_timeout.request->m_timeout) removeRequest(m_timeout.request);
         m_timeouts.pop();
-
+        removeRequest(request);
         continue;
 
       }
-
-      if (m_timeout.timeout == m_timeout.request->m_timeout) 
-      {
-
-        timeout = (m_timeout.timeout - now).count();
-        break;
-
-      }
-
-      m_timeouts.pop();
+  
+      timeout = (request->m_timeout - now).count();
+      break;
 
     }
 
     epoll_event* events = m_events.data();
     std::size_t eventSize = m_events.size();
+
+    std::cout << "listening: " << eventSize << "\n";
+    std::cout << "timeout: " << timeout << "\n";
 
     lock.unlock();
 
@@ -173,7 +166,7 @@ int Server::listen(const char* port)
     if (epolls == 0)
     {
 
-      removeRequest(m_timeouts.front().request);
+      removeRequest(m_timeouts.top());
       m_timeouts.pop();
 
     }
@@ -184,10 +177,13 @@ int Server::listen(const char* port)
       if (m_events[i].events & EPOLLERR || m_events[i].events & EPOLLHUP)
       {
 
+        std::cout << "pipe err\n";
+
         if (m_events[i].data.ptr == &m_listenSocket) continue;
 
         Request* request = static_cast<Request*>(m_events[i].data.ptr);
 
+        m_timeouts.erase(request);
         removeRequest(request);
 
       }
@@ -236,7 +232,6 @@ int Server::listen(const char* port)
           }
 
           lock.lock();
-          std::cout << "new con\n";
           m_events.push_back({});
           lock.unlock();
 
@@ -257,21 +252,19 @@ int Server::listen(const char* port)
       case REQUEST_INCOMPLETE: // dont push to timeout
         break;
       case REQUEST_CLOSE: // we should close it if its aint in timeouts
-        if (request->m_parsed) break;
-
-        removeRequest(request);
-
+        std::cout << "REQUEST_CLOSE\n";
+        //removeRequest(request);
         break;
       case REQUEST_CHUNK_ERROR: // timeout should habdling it, but its not so great, we should atleast remove it from event list
         break;
       default:
-
+        std::cout << "REQUEST_DEFAULT_ERROR\n";
+        std::cout << "fd: " << request->m_socket << "\n";
         if (status == REQUEST_ERROR) PRINT_ERROR("Request::parse", 33);
-        if (request->m_parsed) break;
 
         send(request->m_socket, "WTF UR DOING", 12, 0); // send some http response
 
-        removeRequest(request);
+        //removeRequest(request);
                 
         break;
       }

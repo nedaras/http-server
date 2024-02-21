@@ -95,18 +95,14 @@ void Response::writeBody(std::string_view buffer) const
 void Response::end() const
 {
 
-  if (m_request->m_socket == 0)
-  {
-    m_server->removeRequest(m_request);
-    return;
-  }
-
   if (m_chunkSent) send(m_request->m_socket, "0\r\n\r\n", 5, 0);
+
+  m_server->m_mutex.lock();
+  m_server->m_timeouts.erase(m_request);
 
   m_request->updateTimeout(5000);
 
-  m_server->m_mutex.lock();
-  m_server->m_timeouts.push({ m_request, m_request->m_timeout }); 
+  m_server->m_timeouts.push(m_request); 
   m_server->m_mutex.unlock();
 
 }

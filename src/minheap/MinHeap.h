@@ -1,12 +1,14 @@
 #pragma once
 
+#include <functional>
 #include <iostream>
+#include <queue>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
-template <typename T>
+template <typename T, typename Compare = std::less<T>>
 class MinHeap
 {
 
@@ -22,6 +24,11 @@ public:
   T top() const
   {
     return m_vector[1];
+  }
+
+  std::size_t size() const
+  {
+    return m_size;
   }
 
   void push(T value)
@@ -60,8 +67,10 @@ public:
 
   }
 
-  void erase(T value) // this sucks balls
+  void erase(T value)
   {
+
+    if (m_indices.find(value) == m_indices.end()) return;
 
     std::size_t i = *m_indices.at(value).begin();
     m_indices.at(value).erase(i);
@@ -78,7 +87,7 @@ public:
 
     std::swap(m_vector[i], m_vector[m_size--]);
 
-    if (m_vector[i] < m_vector[m_getParent(i)])
+    if (m_compare(m_vector[m_getParent(i)], m_vector[i]))
     {
 
       m_shiftDown(i);
@@ -99,7 +108,7 @@ private:
     if (i > m_size) return;
     if (i == 1) return;
 
-    if (m_vector[i] < m_vector[m_getParent(i)])
+    if (m_compare(m_vector[m_getParent(i)], m_vector[i]))
     {
 
       // is there no better way to swap it?
@@ -128,8 +137,10 @@ private:
 
     std::size_t swapId = i;
 
-    if (m_getLeft(i) <= m_size && m_vector[i] > m_vector[m_getLeft(i)]) swapId = m_getLeft(i);
-    if (m_getRight(i) <= m_size && m_vector[swapId] > m_vector[m_getRight(i)]) swapId = m_getRight(i);
+    //if (m_getLeft(i) <= m_size && m_vector[i] > m_vector[m_getLeft(i)]) swapId = m_getLeft(i);
+    if (m_getLeft(i) <= m_size && m_compare(m_vector[i], m_vector[m_getLeft(i)])) swapId = m_getLeft(i);
+    //if (m_getRight(i) <= m_size && m_vector[swapId] > m_vector[m_getRight(i)]) swapId = m_getRight(i);
+    if (m_getRight(i) <= m_size && m_compare(m_vector[swapId], m_vector[m_getRight(i)])) swapId = m_getRight(i);
 
     if (swapId == i) return;
 
@@ -166,8 +177,9 @@ private:
 private:
 
   std::vector<T> m_vector = { {} }; // first garbage value becouse we need to be able to bit shift
-  std::unordered_map<T, std::unordered_set<std::size_t>> m_indices;
+  std::unordered_map<T, std::unordered_set<std::size_t>> m_indices; // for requests one key value pair would be better
 
   std::size_t m_size = 0;
+  Compare m_compare;
 
 };
