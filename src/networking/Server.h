@@ -21,13 +21,7 @@ public:
 
 private:
 
-  void removeRequest(Request* request); 
-
-private:
-
   friend class Response;
-
-  std::mutex m_mutex;
 
   const std::function<void(const Request* request, const Response& response)> m_callback;
 
@@ -36,7 +30,7 @@ private:
 
     bool operator()(Request* left, Request* right)
     {
-      return left > right;
+      return left->m_timeout > right->m_timeout;
     }
 
   };

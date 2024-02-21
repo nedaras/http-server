@@ -12,8 +12,6 @@ void Handler(const Request* request, const Response& response)
   // GOAL: non blocking read chunks and write to file, meaning that we can have unlimited conections
   // GOAL: intensive CPU work for handling chunked data, meaning async io with multithreading together
   
-  std::cout << request->getPath() << "\n";
-
   if (request->getPath() == "/favicon.ico")
   {
 

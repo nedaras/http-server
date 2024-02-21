@@ -5,7 +5,6 @@
 #include <iostream>
 #include <cerrno>
 #include <cstring>
-#include <mutex>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -15,36 +14,11 @@
 
 #define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // trowed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
 
-// TODO: better api,
-// TODO: strict http parser
-// TODO: chunked data handling
-// TODO: profit
-// TODO: turn of recv travic if we aint expecting to recv
- 
-// should we crash at errors?
-
 static int setNonBlocking(int socket)
 {
 
   int flags = fcntl(socket, F_GETFL, 0);
   return flags ? fcntl(socket, F_SETFL, flags | O_NONBLOCK) : -1;
-
-}
-
-void Server::removeRequest(Request* request)
-{
-
-  epoll_event event {};
-
-  if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
-
-  m_mutex.lock();
-  m_events.pop_back(); 
-  m_mutex.unlock();
-
-  close(request->m_socket);
-
-  delete request;
 
 }
 
@@ -131,19 +105,24 @@ int Server::listen(const char* port)
 
     std::chrono::milliseconds::rep timeout = -1;
 
-    std::unique_lock<std::mutex> lock(m_mutex);
-
     while (!m_timeouts.empty())
     {
 
       Request* request = m_timeouts.top();
       std::chrono::milliseconds now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
 
-      if (now > request->m_timeout)
+      if (now >= request->m_timeout)
       {
 
+        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
+
         m_timeouts.pop();
-        removeRequest(request);
+        m_events.pop_back();
+
+        close(request->m_socket);
+
+        delete request;
+
         continue;
 
       }
@@ -156,18 +135,38 @@ int Server::listen(const char* port)
     epoll_event* events = m_events.data();
     std::size_t eventSize = m_events.size();
 
-    std::cout << "listening: " << eventSize << "\n";
-    std::cout << "timeout: " << timeout << "\n";
-
-    lock.unlock();
-
     int epolls = epoll_wait(m_epoll, events, eventSize, timeout);
 
     if (epolls == 0)
     {
 
-      removeRequest(m_timeouts.top());
-      m_timeouts.pop();
+      while (!m_timeouts.empty())
+      {
+
+        Request* request = m_timeouts.top();
+        std::chrono::milliseconds now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+
+        if (now >= request->m_timeout)
+        {
+
+          if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
+
+          m_timeouts.pop();
+          m_events.pop_back();
+
+          close(request->m_socket);
+
+          delete request;
+
+          continue;
+
+        }
+
+        break;
+
+      }
+
+      continue;
 
     }
 
@@ -183,8 +182,16 @@ int Server::listen(const char* port)
 
         Request* request = static_cast<Request*>(m_events[i].data.ptr);
 
+        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
+
         m_timeouts.erase(request);
-        removeRequest(request);
+        m_events.pop_back();
+
+        close(request->m_socket);
+
+        delete request;
+
+        break;
 
       }
 
@@ -231,9 +238,7 @@ int Server::listen(const char* port)
             break;
           }
 
-          lock.lock();
           m_events.push_back({});
-          lock.unlock();
 
         }
 
@@ -247,25 +252,54 @@ int Server::listen(const char* port)
       switch (status)
       {
       case REQUEST_SUCCESS:
+
         m_callback(request, Response(request, this));
+
+        m_timeouts.erase(request);
+
+        request->updateTimeout(5000);
+
+        m_timeouts.push(request);
+
         break;
-      case REQUEST_INCOMPLETE: // dont push to timeout
+      case REQUEST_INCOMPLETE:
         break;
-      case REQUEST_CLOSE: // we should close it if its aint in timeouts
-        std::cout << "REQUEST_CLOSE\n";
-        //removeRequest(request);
+      case REQUEST_CLOSE:
+
+        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
+
+        m_timeouts.erase(request);
+        m_events.pop_back();
+
+        close(request->m_socket);
+
+        delete request;
+
         break;
-      case REQUEST_CHUNK_ERROR: // timeout should habdling it, but its not so great, we should atleast remove it from event list
+      case REQUEST_CHUNK_ERROR:
+
+        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
+
+        m_timeouts.erase(request);
+        m_events.pop_back();
+
+        close(request->m_socket);
+
+        delete request;
+
         break;
       default:
-        std::cout << "REQUEST_DEFAULT_ERROR\n";
-        std::cout << "fd: " << request->m_socket << "\n";
-        if (status == REQUEST_ERROR) PRINT_ERROR("Request::parse", 33);
+        if (status == REQUEST_ERROR) PRINT_ERROR("Request::parse", 33); // there are some errors which are like close
 
-        send(request->m_socket, "WTF UR DOING", 12, 0); // send some http response
+        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
 
-        //removeRequest(request);
-                
+        m_timeouts.erase(request);
+        m_events.pop_back();
+
+        close(request->m_socket);
+
+        delete request;
+
         break;
       }
 
@@ -273,9 +307,7 @@ int Server::listen(const char* port)
 
   }
 
-  epoll_event event {};
-  
-  if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, m_listenSocket, &event) == -1) PRINT_ERROR("epoll_ctl", 0);
+  if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, m_listenSocket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
 
   close(m_listenSocket);
   close(m_epoll); 

@@ -53,7 +53,7 @@ public:
 
     m_indices.at(m_vector[1]).erase(1);
 
-    if (m_indices.at(m_vector[1]).empty()) m_indices.erase(m_vector[1]); // this erase shits up
+    if (m_indices.at(m_vector[1]).empty()) m_indices.erase(m_vector[1]);
 
     if (m_size != 1)
     {
@@ -73,6 +73,15 @@ public:
     if (m_indices.find(value) == m_indices.end()) return;
 
     std::size_t i = *m_indices.at(value).begin();
+   
+    if (i == 1)
+    {
+
+      pop();
+      return;
+
+    }
+
     m_indices.at(value).erase(i);
 
     if (m_indices.at(value).empty()) m_indices.erase(value);
@@ -137,9 +146,7 @@ private:
 
     std::size_t swapId = i;
 
-    //if (m_getLeft(i) <= m_size && m_vector[i] > m_vector[m_getLeft(i)]) swapId = m_getLeft(i);
     if (m_getLeft(i) <= m_size && m_compare(m_vector[i], m_vector[m_getLeft(i)])) swapId = m_getLeft(i);
-    //if (m_getRight(i) <= m_size && m_vector[swapId] > m_vector[m_getRight(i)]) swapId = m_getRight(i);
     if (m_getRight(i) <= m_size && m_compare(m_vector[swapId], m_vector[m_getRight(i)])) swapId = m_getRight(i);
 
     if (swapId == i) return;
