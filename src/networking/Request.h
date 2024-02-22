@@ -19,6 +19,12 @@ enum REQUEST_STATUS
   REQUEST_CHUNK_ERROR 
 };
 
+struct ParserResponse
+{
+  REQUEST_STATUS status;
+  bool newRequest;
+};
+
 class Request
 {
 
@@ -33,11 +39,11 @@ public:
 
   std::string_view getPath() const;
 
-  void updateTimeout(unsigned long milliseconds);
+  void updateTimeout(unsigned long milliseconds); // this should not be public
 
 private:
 
-  REQUEST_STATUS m_parse();
+  ParserResponse m_parse();
 
 private:
 
@@ -45,11 +51,15 @@ private:
   friend class Response;
 
   int m_socket;
+
   std::chrono::milliseconds m_timeout; 
 
   http::Parser m_parser;
-  
+ 
+  std::string_view m_method;
   std::string_view m_path;
+
+  bool m_firstRequest = true;
 
   constexpr static std::size_t m_bufferLength = 8 * 1024;
 

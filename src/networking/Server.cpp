@@ -9,7 +9,6 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
-#include <vector>
 #include <fcntl.h>
 
 #define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // trowed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
@@ -176,8 +175,6 @@ int Server::listen(const char* port)
       if (m_events[i].events & EPOLLERR || m_events[i].events & EPOLLHUP)
       {
 
-        std::cout << "pipe err\n";
-
         if (m_events[i].data.ptr == &m_listenSocket) continue;
 
         Request* request = static_cast<Request*>(m_events[i].data.ptr);
@@ -219,7 +216,7 @@ int Server::listen(const char* port)
           
           Request* request = new Request(clientSocket);
 
-          if (request == nullptr) // if this happens just close program
+          if (request == nullptr)
           {
             std::cout << "nullptr request\n";
             close(clientSocket);
@@ -238,7 +235,11 @@ int Server::listen(const char* port)
             break;
           }
 
+
           m_events.push_back({});
+
+          request->updateTimeout(60000); // we will wait one min for user to complete a request
+          m_timeouts.push(request);
 
         }
 
@@ -247,22 +248,28 @@ int Server::listen(const char* port)
       }
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
-      REQUEST_STATUS status = request->m_parse(); // lets make this http 1.1, it means that we handle chunks and other http requests
+      auto [ status, newRequest ] = request->m_parse(); // lets make this http 1.1, it means that we handle chunks and other http requests
 
       switch (status)
       {
       case REQUEST_SUCCESS:
 
-        m_callback(request, Response(request, this));
-
         m_timeouts.erase(request);
 
-        request->updateTimeout(5000);
+        m_callback(request, Response(request, this)); // update timeouts in Response::end function
 
+        request->updateTimeout(5000);
         m_timeouts.push(request);
 
         break;
       case REQUEST_INCOMPLETE:
+
+        if (!newRequest) break;
+
+        m_timeouts.erase(request);
+        request->updateTimeout(60000);
+        m_timeouts.push(request);
+
         break;
       case REQUEST_CLOSE:
 
@@ -289,7 +296,7 @@ int Server::listen(const char* port)
 
         break;
       default:
-        if (status == REQUEST_ERROR) PRINT_ERROR("Request::parse", 33); // there are some errors which are like close
+        if (status == REQUEST_ERROR) PRINT_ERROR("Request::parse", 0); // there are some errors which are like close
 
         if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
 
