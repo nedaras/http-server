@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -19,12 +20,19 @@ enum REQUEST_STATUS
   REQUEST_CHUNK_ERROR 
 };
 
+enum REQUEST_EVENTS : char
+{
+  END,
+  DATA
+};
+
 struct ParserResponse
 {
   REQUEST_STATUS status;
   bool newRequest;
 };
 
+class Response;
 class Request
 {
 
@@ -37,13 +45,16 @@ public:
 
   std::optional<std::string_view> getHeader(std::string_view header) const;
 
-  std::string_view getPath() const;
+public:
 
-  void updateTimeout(unsigned long milliseconds); // this should not be public
+  std::string_view method;
+  std::string_view path;
 
 private:
 
   ParserResponse m_parse();
+
+  void m_updateTimeout(unsigned long milliseconds);
 
 private:
 
@@ -55,9 +66,6 @@ private:
   std::chrono::milliseconds m_timeout; 
 
   http::Parser m_parser;
- 
-  std::string_view m_method;
-  std::string_view m_path;
 
   bool m_firstRequest = true;
 

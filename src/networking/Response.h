@@ -14,6 +14,7 @@ public:
   void writeHead(std::string_view key, std::string_view value) const;
 
   void write(std::string_view buffer) const;
+  void write(const char* buffer, std::size_t size) const;
 
   void writeBody(std::string_view buffer) const;
 

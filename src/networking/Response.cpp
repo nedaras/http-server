@@ -53,17 +53,25 @@ static std::size_t toHex(char*& buffer, std::size_t number)
 
 }
 
-void Response::write(std::string_view buffer) const // send chunked, writeData will send not chunked
+void Response::write(std::string_view buffer) const
+{
+
+  write(buffer.data(), buffer.size());
+
+}
+
+
+void Response::write(const char* buffer, std::size_t size) const
 {
 
   if (m_request->m_socket == 0) return;
 
-  if (buffer.size() > 0x10000) return; // sending too much, break it up
+  if (size > 0x10000) return; // sending too much, break it up
 
   char hexBuffer[5];
   char* pHexBuffer = hexBuffer;
 
-  std::size_t length = toHex(pHexBuffer, buffer.size());
+  std::size_t length = toHex(pHexBuffer, size);
   
   if (!m_chunkSent)
   {
@@ -73,7 +81,7 @@ void Response::write(std::string_view buffer) const // send chunked, writeData w
 
   send(m_request->m_socket, pHexBuffer, length, 0); 
   send(m_request->m_socket, "\r\n", 2, 0);
-  send(m_request->m_socket, buffer.data(), buffer.size(), 0);
+  send(m_request->m_socket, buffer, size, 0);
   send(m_request->m_socket, "\r\n", 2, 0);
 
 }
@@ -96,5 +104,8 @@ void Response::end() const
 {
 
   if (m_chunkSent) send(m_request->m_socket, "0\r\n\r\n", 5, 0);
+
+  m_request->m_updateTimeout(5000);
+  m_server->m_timeouts.push(m_request);
 
 }

@@ -1,5 +1,9 @@
 #include "parser.h"
+#include <algorithm>
 #include <cstdint>
+#include <iostream>
+#include <memory>
+#include <string_view>
 
 // TODO: make return values an error return values
 // TODO: make some standards like what chars can be used idk utf-8 if im not bored
@@ -59,13 +63,67 @@ static constexpr bool IS_TOKEN(char c)
   return tokens[static_cast<std::uint8_t>(c) >> 3] & (1 << (static_cast<std::uint8_t>(c) & 7));
 }
 
+static constexpr bool IS_NUMBER(char c)
+{
+  return c >= '0' && c <= '9';
+}
+
 static constexpr bool IS_URL_CHAR(char c)
 {
   return url_tokens[static_cast<std::uint8_t>(c) >> 3] & (1 << (static_cast<std::uint8_t>(c) & 7));
 }
 
+static std::int32_t toNumber(std::string_view buffer)
+{
+
+  static constexpr std::size_t bufferSize = 5;
+
+  std::int32_t result = 0;
+  std::uint16_t position = 1;
+
+  std::uint8_t i = 1;
+
+  while (std::min(buffer.size(), bufferSize) >= i)
+  {
+
+    char c = buffer[buffer.size() - i];
+
+    if (!IS_NUMBER(c)) return -1;
+
+    result += (c - '0') * position;
+    position *= 10;
+
+    i++;
+
+  }
+
+  return result;
+
+}
+
+// TODO: make int like throwable
+void http::Parser::m_newHeader(Header& header)
+{
+
+  if (header.key == "Content-Length")
+  {
+
+    std::int32_t length = toNumber(header.value);
+
+    if (length == -1 || length > 0x10000) return; // return -1, or state idk
+
+    bodyLength = length;
+
+  }
+
+  headers.push_back(m_header);
+
+}
+
 // if would want to add like some special state of headers, when using POST requests we will have to refactor this code
 // to make it more simple to obtain
+
+// it only parsed the headers which is cool but u know
 int http::Parser::parse(std::size_t bytes) // mb build unit tests
 {
 
@@ -172,7 +230,7 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
       if (*m_buffer == '\r')
       {
         m_header.value = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
-        headers.push_back(m_header);
+        m_newHeader(m_header);
         m_state = REQUEST_HEADER_END;
 
         break;
@@ -185,6 +243,15 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
       m_state = REQUEST_HEADER_KEY_BEGIN;
       break;
     case REQUEST_EOF:
+
+      if (bodyLength > 0)
+      {
+        // what we want todo is call that server m_callback with the body data,
+        // if its says chunked encoding, it means that we need to get more data on the events
+        std::cout << "we have some content\n";
+
+      }
+
       return *m_buffer == '\n' ? 0 : -1;
     }
   

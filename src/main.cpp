@@ -1,71 +1,65 @@
 #include "networking/Server.h"
-#include <iostream>
+#include <array>
+#include <filesystem>
+#include <fstream>
+#include <string>
+#include <string_view>
 
-// i think best practise is to handle non blocking io in main thread and intensive cpu work in threadpool
+namespace fs = std::filesystem;
 
-// so this is intensive cpu but we can like add request.onData and do dome stuff im main thread
-//
-// mb make Handler func single threaded an inside we can specify if we want to throw it inside threadpool???,
-// thats has to be the best thing
+static fs::path publicDir;
+
+// we aint handling close connection
+// we will add ssh
 void Handler(const Request* request, const Response& response)
 {
-  // GOAL: non blocking read chunks and write to file, meaning that we can have unlimited conections
-  // GOAL: intensive CPU work for handling chunked data, meaning async io with multithreading together
-  
-  if (request->getPath() == "/favicon.ico")
+
+  std::string file = request->path == "/" ? "index.html" : std::string(&request->path[1], request->path.size() - 1);
+  std::string extension = file.substr(file.find('.') + 1);
+
+  response.writeHead("Content-Type", "text/" + extension);
+  response.writeHead("Connection", "keep-alive");
+
+  if (request->path == "/")
   {
 
-    response.writeHead("Content-Type", "text/html");
-    response.writeHead("Connection", "keep-alive");
-
-    response.writeBody("no fav icon."); 
-
-    response.end();
 
   }
 
-  if (request->getPath() == "/css/style.css")
+  if (!fs::exists(publicDir / file))
   {
 
-    response.writeHead("Content-Type", "text/css");
-    response.writeHead("Connection", "keep-alive");
-
-    response.writeBody("h2 { color: red; }"); 
-
+    response.writeBody("no file brah");
     response.end();
 
     return;
 
   }
 
-  response.writeHead("Content-Type", "text/html");
-  response.writeHead("Connection", "keep-alive");
   response.writeHead("Transfer-Encoding", "chunked");
 
-  response.write("<!DOCTYPE html><html><head><link rel='stylesheet' href='./css/style.css'></head><body><h1>hello world</h1>");
-  response.write("<h2>this is a chunk</h2>");
-  response.write("</body></html>");
+  std::ifstream stream(publicDir / file);
+  std::array<char, 0x1000> buffer;
+  
+  while (!stream.eof())
+  {
+
+    stream.read(buffer.data(), buffer.size());
+    ssize_t length = stream.gcount();
+
+    if (length > 0) response.write(buffer.data(), length);
+
+  }
 
   response.end();
 
 }
 
-struct Compare
-{
-
-  bool operator()(float& left, float& right) const
-  {
-
-    return left > right;
-
-  }
-
-};
-
 int main()
 {
-  // mb init threadpool here
-  
+
+  publicDir = fs::read_symlink("/proc/self/exe").parent_path().parent_path().parent_path() / "public";
+
   Server server(Handler);
 
   server.listen("3000");

@@ -1,12 +1,12 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string_view>
 #include <vector>
 
 namespace http
 {
-
 
 struct Header
 { 
@@ -33,6 +33,12 @@ public:
   std::string_view path;
  // we net to bench mark but mb map would be faster, it should be for sure if the headers would be very big, but it aint
   std::vector<Header> headers;
+
+  std::size_t bodyLength = 0;
+
+private:
+
+  void m_newHeader(Header& header);
 
 private:
 
@@ -62,7 +68,7 @@ private:
 
   char* m_buffer;
   char* m_unhandledBuffer;
-  
+
   Header m_header;
   STATE m_state = REQUEST_METHOD;
 

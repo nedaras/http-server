@@ -1,7 +1,9 @@
 #include "Request.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
+#include <iostream>
 #include <sys/socket.h>
 
 Request::Request(int socket)
@@ -12,7 +14,7 @@ Request::Request(int socket)
 
 }
 
-void Request::updateTimeout(unsigned long milliseconds)
+void Request::m_updateTimeout(unsigned long milliseconds)
 {
 
   m_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) + std::chrono::milliseconds(milliseconds);
@@ -37,7 +39,7 @@ ParserResponse Request::m_parse() // make even more states and rename them what 
     }
    
     ssize_t bytes = recv(m_socket, m_buffer.get() + m_bufferSize, m_bufferLength - m_bufferSize, 0);
-    
+
     if (bytes == 0) return { REQUEST_CLOSE, m_firstRequest };
     if (bytes == -1) 
     {
@@ -58,12 +60,19 @@ ParserResponse Request::m_parse() // make even more states and rename them what 
 
     m_bufferSize += bytes;
 
-    switch (m_parser.parse(bytes))
+    switch (m_parser.parse(bytes)) // make this dude read body, parser should return how many bytes we have read till eof
     {
     case 0: // EOF REACHED
       { 
-        m_method = m_parser.method;
-        m_path = m_parser.path;
+        method = m_parser.method;
+        path = m_parser.path;
+
+        if (m_parser.bodyLength > 0)
+        {
+
+          std::cout << "we need to read that damm body yoo\n";
+
+        }
 
         m_parser = http::Parser(m_buffer.get());
         m_bufferSize = 0;
@@ -95,12 +104,5 @@ std::optional<std::string_view> Request::getHeader(std::string_view header) cons
   }
   
   return {};
-
-}
-
-std::string_view Request::getPath() const
-{
-
-  return m_path;
 
 }

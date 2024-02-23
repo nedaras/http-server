@@ -238,7 +238,7 @@ int Server::listen(const char* port)
 
           m_events.push_back({});
 
-          request->updateTimeout(60000); // we will wait one min for user to complete a request
+          request->m_updateTimeout(60000); // we will wait one min for user to complete a request
           m_timeouts.push(request);
 
         }
@@ -258,21 +258,19 @@ int Server::listen(const char* port)
 
         m_callback(request, Response(request, this)); // update timeouts in Response::end function
 
-        request->updateTimeout(5000);
-        m_timeouts.push(request);
 
         break;
       case REQUEST_INCOMPLETE:
-
+        std::cout << "REQUEST_INCOMPLETE\n";
         if (!newRequest) break;
 
         m_timeouts.erase(request);
-        request->updateTimeout(60000);
+        request->m_updateTimeout(60000);
         m_timeouts.push(request);
 
         break;
       case REQUEST_CLOSE:
-
+        std::cout << "REQUEST_CLOSE\n"; 
         if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
 
         m_timeouts.erase(request);
@@ -284,7 +282,7 @@ int Server::listen(const char* port)
 
         break;
       case REQUEST_CHUNK_ERROR:
-
+        std::cout << "REQUEST_CHUNK_ERROR\n";
         if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
 
         m_timeouts.erase(request);
@@ -296,6 +294,7 @@ int Server::listen(const char* port)
 
         break;
       default:
+        std::cout << "REQUEST_DEFAULT_CASE_ERROR: " << status << "\n";
         if (status == REQUEST_ERROR) PRINT_ERROR("Request::parse", 0); // there are some errors which are like close
 
         if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
