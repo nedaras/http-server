@@ -69,6 +69,7 @@ private:
 
   void m_updateTimeout(unsigned long milliseconds);
 
+  std::tuple<REQUEST_STATUS, ssize_t> m_safeRecv(char* buffer, std::size_t bufferSize, std::size_t bufferCapacity);
   constexpr bool m_firstRequest()
   {
     return m_state == REQUEST_WAITING_FOR_DATA;

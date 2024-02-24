@@ -3,9 +3,10 @@
 #include <cerrno>
 #include <chrono>
 #include <cstring>
-#include <iostream>
 #include <memory>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <tuple>
 
 Request::Request(int socket)
 {
@@ -22,6 +23,34 @@ void Request::m_updateTimeout(unsigned long milliseconds)
 
 }
 
+std::tuple<REQUEST_STATUS, ssize_t> Request::m_safeRecv(char* buffer, std::size_t bufferSize, std::size_t bufferCapacity)
+{
+
+  if (bufferSize >= bufferCapacity)
+  {
+
+    char byte;
+    ssize_t bytes = recv(m_socket, &byte, 1, 0);
+
+    return bytes == 0 ? std::make_tuple(REQUEST_CLOSE, bytes) : std::make_tuple(REQUEST_HTTP_BUFFER_ERROR, bytes);
+
+  }
+
+  ssize_t bytes = recv(m_socket, buffer + bufferSize, bufferCapacity - bufferSize, 0);
+
+  if (bytes == 0) return std::make_tuple(REQUEST_CLOSE, bytes);
+  if (bytes == -1)
+  {
+
+    if (errno == EWOULDBLOCK) return std::make_tuple(REQUEST_INCOMPLETE, bytes);
+    return std::make_tuple(REQUEST_ERROR, bytes);
+
+  }
+
+  return std::make_tuple(REQUEST_SUCCESS, bytes);
+
+}
+
 // we using same patterns not cool
 ParserResponse Request::m_parse() // make even more states and rename them what are these names
 {
@@ -32,39 +61,12 @@ ParserResponse Request::m_parse() // make even more states and rename them what 
     if (m_state == REQUEST_READING_BODY)
     {
          
-      if (body.size() >= body.capacity())
-      {
+      auto [ status, bytes ] = m_safeRecv(body.data(), body.size(), body.capacity());
 
-        char byte;
-        ssize_t bytes = recv(m_socket, &byte, 1, 0);
-
-        // we aint checking if its -1 couse we dont care 
-        return bytes == 0 ? ParserResponse{ REQUEST_CLOSE, m_firstRequest() } : ParserResponse{ REQUEST_HTTP_BUFFER_ERROR, m_firstRequest() };
-
-      }
-
-      ssize_t bytes = recv(m_socket, body.data() + body.size(), body.capacity() - body.size(), 0);
-
-      if (bytes == 0) return { REQUEST_CLOSE, m_firstRequest() };
-      if (bytes == -1) 
-      {
-
-        if (errno == EWOULDBLOCK)
-        {
-
-          ParserResponse response { REQUEST_INCOMPLETE, m_firstRequest() }; 
-
-          return response;
-
-        }
-
-        return ParserResponse{ REQUEST_ERROR, m_firstRequest() };
-
-      }
+      if (status != REQUEST_SUCCESS) return { status, m_firstRequest() };
 
       body.resize(body.size() + bytes);
 
-      // bad bad bad bad bad
       if (body.capacity() == body.size())
       {
 
@@ -79,36 +81,9 @@ ParserResponse Request::m_parse() // make even more states and rename them what 
 
     }
 
-    if (m_bufferSize >= m_bufferLength) // no way it can be bigger then length
-    {
+    auto [ status, bytes ] = m_safeRecv(m_buffer.get(), m_bufferSize, m_bufferLength);
 
-      char byte;
-      ssize_t bytes = recv(m_socket, &byte, 1, 0);
-
-      // we aint checking if its -1 couse we dont care 
-      return bytes == 0 ? ParserResponse{ REQUEST_CLOSE, m_firstRequest() } : ParserResponse{ REQUEST_HTTP_BUFFER_ERROR, m_firstRequest() };
-
-    }
-   
-    ssize_t bytes = recv(m_socket, m_buffer.get() + m_bufferSize, m_bufferLength - m_bufferSize, 0);
-
-    if (bytes == 0) return { REQUEST_CLOSE, m_firstRequest() };
-    if (bytes == -1) 
-    {
-
-      if (errno == EWOULDBLOCK)
-      {
-
-        ParserResponse response { REQUEST_INCOMPLETE, m_firstRequest() };
-        m_state = REQUEST_READING_HTTP;
-
-        return response;
-
-      }
-
-      return ParserResponse{ REQUEST_ERROR, m_firstRequest() };
-
-    }
+    if (status != REQUEST_SUCCESS) return { status, m_firstRequest() };
 
     m_bufferSize += bytes;
 
