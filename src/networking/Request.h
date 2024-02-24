@@ -20,6 +20,12 @@ enum REQUEST_STATUS
   REQUEST_CHUNK_ERROR 
 };
 
+enum REQUEST_STATE
+{
+  REQUEST_READING_HTTP,
+  REQUEST_READING_BODY
+};
+
 enum REQUEST_EVENTS : char
 {
   END,
@@ -50,6 +56,10 @@ public:
   std::string_view method;
   std::string_view path;
 
+  // not cool, use string class_
+  std::unique_ptr<char[]> body;
+  std::size_t bodySize = 0;
+
 private:
 
   ParserResponse m_parse();
@@ -67,11 +77,12 @@ private:
 
   http::Parser m_parser;
 
-  bool m_firstRequest = true;
+  bool m_firstRequest = true; // but this in state
+  REQUEST_STATE m_state = REQUEST_READING_HTTP; // make like REQUEST_INIT state idk 
 
   constexpr static std::size_t m_bufferLength = 8 * 1024;
 
   std::unique_ptr<char[]> m_buffer = std::make_unique<char[]>(m_bufferLength); // we can add one bit
-  std::size_t m_bufferSize = 0; 
+  std::size_t m_bufferSize = 0;
 
 };

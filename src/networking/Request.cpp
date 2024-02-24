@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
+#include <cstring>
 #include <iostream>
+#include <memory>
 #include <sys/socket.h>
 
 Request::Request(int socket)
@@ -21,11 +23,72 @@ void Request::m_updateTimeout(unsigned long milliseconds)
 
 }
 
+// we using same patterns not cool
+//
+//
+// waiiiittt we should only reset the buffers and all ofter connection close
 ParserResponse Request::m_parse() // make even more states and rename them what are these names
 {
    
   while (true)
   {
+
+    if (m_state == REQUEST_READING_BODY)
+    {
+   
+      if (bodySize >= m_parser.bodyLength)
+      {
+
+        char byte;
+        ssize_t bytes = recv(m_socket, &byte, 1, 0);
+
+        // we aint checking if its -1 couse we dont care 
+        return bytes == 0 ? ParserResponse{ REQUEST_CLOSE, m_firstRequest } : ParserResponse{ REQUEST_HTTP_BUFFER_ERROR, m_firstRequest };
+
+      }
+
+      ssize_t bytes = recv(m_socket, body.get() + bodySize, m_parser.bodyLength - bodySize, 0);
+
+      if (bytes == 0) return { REQUEST_CLOSE, m_firstRequest };
+      if (bytes == -1) 
+      {
+
+        if (errno == EWOULDBLOCK)
+        {
+
+          ParserResponse response { REQUEST_INCOMPLETE, m_firstRequest };
+          m_firstRequest = false;
+
+          return response;
+
+        }
+
+        return ParserResponse{ REQUEST_ERROR, m_firstRequest };
+
+      }
+
+      bodySize += bytes;
+
+      // bad bad bad bad bad
+      if (m_parser.bodyLength == bodySize)
+      {
+
+        m_parser = http::Parser(m_buffer.get());
+
+        m_bufferSize = 0;
+
+        ParserResponse response { REQUEST_SUCCESS, m_firstRequest };
+        m_firstRequest = true;
+
+        m_state = REQUEST_READING_HTTP;
+
+        return response;
+
+      }
+
+      continue;
+
+    }
 
     if (m_bufferSize >= m_bufferLength) // no way it can be bigger then length
     {
@@ -63,21 +126,35 @@ ParserResponse Request::m_parse() // make even more states and rename them what 
     switch (m_parser.parse(bytes)) // make this dude read body, parser should return how many bytes we have read till eof
     {
     case 0: // EOF REACHED
-      { 
+      {
+
         method = m_parser.method;
         path = m_parser.path;
 
         if (m_parser.bodyLength > 0)
         {
 
-          std::cout << "we need to read that damm body yoo\n";
+          body = std::make_unique<char[]>(m_parser.bodyLength);
+          bodySize = bytes - m_parser.bytesRead;
+
+          char* bodyStart = m_buffer.get() + m_bufferSize - bytes + m_parser.bytesRead;
+
+          std::memcpy(body.get(), bodyStart, bodySize);
+
+          if (m_parser.bodyLength > bodySize)
+          {
+
+            m_state = REQUEST_READING_BODY;  
+
+            break;
+
+          }
+
 
         }
 
         m_parser = http::Parser(m_buffer.get());
         m_bufferSize = 0;
-
-        m_firstRequest = true;
 
         ParserResponse response { REQUEST_SUCCESS, m_firstRequest };
         m_firstRequest = true;

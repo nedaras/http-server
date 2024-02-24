@@ -23,6 +23,8 @@ void Handler(const Request* request, const Response& response)
   if (request->path == "/")
   {
 
+    std::cout.write(request->body.get(), request->bodySize);
+    std::cout << "\nlength: " << request->bodySize << "\n"; 
 
   }
 

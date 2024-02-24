@@ -34,7 +34,9 @@ public:
  // we net to bench mark but mb map would be faster, it should be for sure if the headers would be very big, but it aint
   std::vector<Header> headers;
 
+  std::size_t bytesRead = 0;
   std::size_t bodyLength = 0;
+
 
 private:
 

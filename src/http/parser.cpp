@@ -131,6 +131,9 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
  
   while (m_buffer != end)
   {
+
+    bytesRead++;
+
     switch (m_state)
     {
     case REQUEST_METHOD:
@@ -243,15 +246,6 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
       m_state = REQUEST_HEADER_KEY_BEGIN;
       break;
     case REQUEST_EOF:
-
-      if (bodyLength > 0)
-      {
-        // what we want todo is call that server m_callback with the body data,
-        // if its says chunked encoding, it means that we need to get more data on the events
-        std::cout << "we have some content\n";
-
-      }
-
       return *m_buffer == '\n' ? 0 : -1;
     }
   
