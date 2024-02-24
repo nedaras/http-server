@@ -14,17 +14,17 @@ static fs::path publicDir;
 void Handler(const Request* request, const Response& response)
 {
 
-  std::string file = request->path == "/" ? "index.html" : std::string(&request->path[1], request->path.size() - 1);
+  std::string file = request->getPath() == "/" ? "index.html" : std::string(&request->getPath()[1], request->getPath().size() - 1);
   std::string extension = file.substr(file.find('.') + 1);
 
   response.writeHead("Content-Type", "text/" + extension);
   response.writeHead("Connection", "keep-alive");
 
-  if (request->path == "/")
+  if (request->getPath() == "/")
   {
 
-    std::cout.write(request->body.get(), request->bodySize);
-    std::cout << "\nlength: " << request->bodySize << "\n"; 
+    std::cout << request->body;
+    std::cout << "\nlength: " << request->body.size() << "\n"; 
 
   }
 

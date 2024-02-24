@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <string_view>
 #include <vector>
 #include "../http/parser.h"
@@ -20,13 +21,15 @@ enum REQUEST_STATUS
   REQUEST_CHUNK_ERROR 
 };
 
-enum REQUEST_STATE
+enum REQUEST_STATE : char
 {
+  REQUEST_WAITING_FOR_DATA,
   REQUEST_READING_HTTP,
-  REQUEST_READING_BODY
+  REQUEST_READING_BODY,
+  REQUESR_READING_CHUNKS
 };
 
-enum REQUEST_EVENTS : char
+enum REQUEST_EVENTS : std::uint32_t
 {
   END,
   DATA
@@ -51,20 +54,25 @@ public:
 
   std::optional<std::string_view> getHeader(std::string_view header) const;
 
+  constexpr std::string_view getPath() const
+  {
+    return m_parser.path;
+  }
+
 public:
 
-  std::string_view method;
-  std::string_view path;
-
-  // not cool, use string class_
-  std::unique_ptr<char[]> body;
-  std::size_t bodySize = 0;
+  std::string body;
 
 private:
 
   ParserResponse m_parse();
 
   void m_updateTimeout(unsigned long milliseconds);
+
+  constexpr bool m_firstRequest()
+  {
+    return m_state == REQUEST_WAITING_FOR_DATA;
+  }
 
 private:
 
@@ -77,8 +85,7 @@ private:
 
   http::Parser m_parser;
 
-  bool m_firstRequest = true; // but this in state
-  REQUEST_STATE m_state = REQUEST_READING_HTTP; // make like REQUEST_INIT state idk 
+  REQUEST_STATE m_state = REQUEST_WAITING_FOR_DATA;
 
   constexpr static std::size_t m_bufferLength = 8 * 1024;
 
