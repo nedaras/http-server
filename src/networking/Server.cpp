@@ -184,6 +184,8 @@ int Server::listen(const char* port)
         m_timeouts.erase(request);
         m_events.pop_back();
 
+        request->m_callEvent(END, "err");
+
         close(request->m_socket);
 
         delete request;
@@ -255,9 +257,9 @@ int Server::listen(const char* port)
       case REQUEST_SUCCESS:
 
         m_timeouts.erase(request);
+        m_callback(request, Response(request, this));
 
-        m_callback(request, Response(request, this)); // update timeouts in Response::end function
-
+        request->m_callEvent(END, "end");
 
         break;
       case REQUEST_INCOMPLETE:
@@ -275,6 +277,8 @@ int Server::listen(const char* port)
 
         m_timeouts.erase(request);
         m_events.pop_back();
+        
+        request->m_callEvent(END, "close");
 
         close(request->m_socket);
 
@@ -301,6 +305,8 @@ int Server::listen(const char* port)
 
         m_timeouts.erase(request);
         m_events.pop_back();
+
+        request->m_callEvent(END, "req_err");
 
         close(request->m_socket);
 

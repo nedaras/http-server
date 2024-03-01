@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -21,7 +22,7 @@ enum REQUEST_STATUS
   REQUEST_CHUNK_ERROR 
 };
 
-enum REQUEST_STATE : char
+enum REQUEST_STATE : std::uint8_t
 {
   REQUEST_WAITING_FOR_DATA,
   REQUEST_READING_HTTP,
@@ -29,7 +30,7 @@ enum REQUEST_STATE : char
   REQUESR_READING_CHUNKS
 };
 
-enum REQUEST_EVENTS : std::uint32_t
+enum REQUEST_EVENTS : std::uint8_t
 {
   END,
   DATA
@@ -59,6 +60,9 @@ public:
     return m_parser.path;
   }
 
+  using EventFunction = std::function<void(std::string_view data)>;
+  void on(REQUEST_EVENTS event, const EventFunction& function) const;
+
 public:
 
   std::string body;
@@ -70,6 +74,9 @@ private:
   void m_updateTimeout(unsigned long milliseconds);
 
   std::tuple<REQUEST_STATUS, ssize_t> m_safeRecv(char* buffer, std::size_t bufferSize, std::size_t bufferCapacity);
+
+  void m_callEvent(REQUEST_EVENTS event, std::string_view data) const;
+
   constexpr bool m_firstRequest()
   {
     return m_state == REQUEST_WAITING_FOR_DATA;
@@ -81,8 +88,9 @@ private:
   friend class Response;
 
   int m_socket;
+  std::chrono::milliseconds m_timeout;
 
-  std::chrono::milliseconds m_timeout; 
+  mutable std::unique_ptr<EventFunction> m_events[2];
 
   http::Parser m_parser;
 
@@ -93,4 +101,7 @@ private:
   std::unique_ptr<char[]> m_buffer = std::make_unique<char[]>(m_bufferLength); // we can add one bit
   std::size_t m_bufferSize = 0;
 
+  mutable bool m_headSent = false;
+  mutable bool m_chunkSent = false;
+  mutable bool m_contentLengthSent = false;
 };

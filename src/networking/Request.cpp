@@ -23,6 +23,17 @@ void Request::m_updateTimeout(unsigned long milliseconds)
 
 }
 
+void Request::on(REQUEST_EVENTS event, const EventFunction& function) const
+{
+  m_events[event] = std::make_unique<EventFunction>(function);
+}
+
+// we need correct porams for events
+void Request::m_callEvent(REQUEST_EVENTS event, std::string_view data) const
+{
+  if (m_events[event]) (*m_events[event])(data);
+}
+
 std::tuple<REQUEST_STATUS, ssize_t> Request::m_safeRecv(char* buffer, std::size_t bufferSize, std::size_t bufferCapacity)
 {
 

@@ -27,9 +27,6 @@ private:
   Request* m_request;
   Server* m_server;
 
-  mutable bool m_headSent = false;
-  mutable bool m_chunkSent = false;
-  mutable bool m_contentLengthSent = false;
 
 };
 
