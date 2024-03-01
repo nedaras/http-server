@@ -22,11 +22,17 @@ public:
 
 private:
 
+  constexpr Request::ResponseData& m_responseData() const
+  {
+    return m_request->m_responseData;
+  }
+
+private:
+
   friend class Server;
 
   Request* m_request;
   Server* m_server;
-
 
 };
 

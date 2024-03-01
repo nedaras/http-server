@@ -20,17 +20,12 @@ void Handler(const Request* request, const Response& response)
   response.writeHead("Content-Type", "text/" + extension);
   response.writeHead("Connection", "keep-alive");
 
-  // oh we need to store all data in request,
-  // and make it simply reset at end
-  std::cout << request->getPath() << "\n";
   request->on(END, [request, response](std::string_view data) {
-
-    std::cout << request->getPath() << "\n";
-    std::cout << "con byebye " << data << "\n"; 
 
     response.end();
 
   });
+
   // should we put body is this data thing or just send chunked data here
   request->on(DATA, [](std::string_view data) {
 

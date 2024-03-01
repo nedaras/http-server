@@ -17,10 +17,10 @@ void Response::writeHead(std::string_view key, std::string_view value) const
 
   if (m_request->m_socket == 0) return;
 
-  if (!m_request->m_headSent)
+  if (!m_responseData().headSent)
   {
     send(m_request->m_socket, "HTTP/1.1 200 OK\r\n", 17, 0);
-    m_request->m_headSent = true;
+    m_responseData().headSent = true;
   }
 
   send(m_request->m_socket, key.data(), key.size(), 0);
@@ -73,10 +73,10 @@ void Response::write(const char* buffer, std::size_t size) const
 
   std::size_t length = toHex(pHexBuffer, size);
   
-  if (!m_request->m_chunkSent)
+  if (!m_responseData().chunkSent)
   {
     send(m_request->m_socket, "\r\n", 2, 0);
-    m_request->m_chunkSent = true;
+    m_responseData().chunkSent = true;
   }
 
   send(m_request->m_socket, pHexBuffer, length, 0); 
@@ -89,10 +89,10 @@ void Response::write(const char* buffer, std::size_t size) const
 void Response::writeBody(std::string_view buffer) const
 {
 
-  if (!m_request->m_contentLengthSent)
+  if (!m_responseData().contentLengthSent)
   {
     writeHead("Content-Length", std::to_string(buffer.size()));
-    m_request->m_contentLengthSent = true;
+    m_responseData().contentLengthSent = true;
   }
   
   send(m_request->m_socket, "\r\n", 2, 0);
@@ -103,7 +103,7 @@ void Response::writeBody(std::string_view buffer) const
 void Response::end() const
 {
 
-  if (m_request->m_chunkSent) send(m_request->m_socket, "0\r\n\r\n", 5, 0);
+  if (m_responseData().chunkSent) send(m_request->m_socket, "0\r\n\r\n", 5, 0);
 
   m_request->m_parser = http::Parser(m_request->m_buffer.get());
   m_request->m_bufferSize = 0;
@@ -111,8 +111,6 @@ void Response::end() const
   m_request->m_updateTimeout(5000);
   m_server->m_timeouts.push(m_request);
 
-  m_request->m_headSent = false;
-  m_request->m_chunkSent = false;
-  m_request->m_contentLengthSent = false;
+  m_responseData() = Request::ResponseData();
 
 }

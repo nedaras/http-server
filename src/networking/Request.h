@@ -101,7 +101,13 @@ private:
   std::unique_ptr<char[]> m_buffer = std::make_unique<char[]>(m_bufferLength); // we can add one bit
   std::size_t m_bufferSize = 0;
 
-  mutable bool m_headSent = false;
-  mutable bool m_chunkSent = false;
-  mutable bool m_contentLengthSent = false;
+  struct ResponseData
+  {
+    bool headSent = false;
+    bool chunkSent = false;
+    bool contentLengthSent = false;
+  };
+
+  ResponseData m_responseData;
+
 };
