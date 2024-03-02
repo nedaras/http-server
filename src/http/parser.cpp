@@ -1,6 +1,7 @@
 #include "parser.h"
 #include <algorithm>
 #include <cstdint>
+#include <iostream>
 #include <string_view>
 
 // TODO: make return values an error return values
@@ -76,6 +77,8 @@ static std::int32_t toNumber(std::string_view buffer)
 
   static constexpr std::size_t bufferSize = 5;
 
+  if (buffer.size() > bufferSize) return -1;
+
   std::int32_t result = 0;
   std::uint16_t position = 1;
 
@@ -100,7 +103,7 @@ static std::int32_t toNumber(std::string_view buffer)
 }
 
 // TODO: make int like throwable
-void http::Parser::m_newHeader(Header& header)
+int http::Parser::m_newHeader(Header& header)// ret errors back
 {
 
   if (header.key == "Content-Length")
@@ -108,13 +111,22 @@ void http::Parser::m_newHeader(Header& header)
 
     std::int32_t length = toNumber(header.value);
 
-    if (length == -1 || length > 0x10000) return; // return -1, or state idk
+    if (length == -1 || length > 0x10000) return -1; // return -1, or state idk
 
     bodyLength = length;
 
   }
 
+  if (header.key == "Transfer-Encoding") // well it only works with chunked
+  {
+
+    chunked = true;
+
+  }
+
   headers.push_back(m_header);
+
+  return 0;
 
 }
 
@@ -231,7 +243,7 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
       if (*m_buffer == '\r')
       {
         m_header.value = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
-        m_newHeader(m_header);
+        if (m_newHeader(m_header) == -1) return -1;
         m_state = REQUEST_HEADER_END;
 
         break;

@@ -240,6 +240,8 @@ int Server::listen(const char* port)
 
           m_events.push_back({});
 
+          std::cout << "new req\n";
+
           request->m_updateTimeout(60000); // we will wait one min for user to complete a request
           m_timeouts.push(request);
 
@@ -259,7 +261,14 @@ int Server::listen(const char* port)
         m_timeouts.erase(request);
         m_callback(request, Response(request, this));
 
+        if (request->m_chunk.size() > 0) // we're calling inital chunk here couse we need init callbacks in request
+        {
+          request->m_callEvent(DATA, request->m_chunk);
+        }
+
         request->m_callEvent(END, "end");
+        //if (!request->m_parser.chunked) request->m_callEvent(END, "end"); // how to know if were like waiting for data or sun, if it chunked,
+                                                                          // then we should call end at 0\r\n\r\n chunk or from timeout
 
         break;
       case REQUEST_INCOMPLETE:
@@ -285,28 +294,22 @@ int Server::listen(const char* port)
         delete request;
 
         break;
-      case REQUEST_CHUNK_ERROR:
-        std::cout << "REQUEST_CHUNK_ERROR\n";
-        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
-
-        m_timeouts.erase(request);
-        m_events.pop_back();
-
-        close(request->m_socket);
-
-        delete request;
-
-        break;
-      default:
+      default: // idk how to send a response if client is still sending data, mb that is not our falt, though some response would be nice
+               // but is it dumb to rech bytes that we know will be thrown in trash
         std::cout << "REQUEST_DEFAULT_CASE_ERROR: " << status << "\n";
         if (status == REQUEST_ERROR) PRINT_ERROR("Request::parse", 0); // there are some errors which are like close
 
         if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
 
+        //const char* response = "HTTP/1.1 413 Request Entity Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+
+        //send(request->m_socket, response, strlen(response), 0);
+
+        // as err event
+        request->m_callEvent(END, "req_err");
+        
         m_timeouts.erase(request);
         m_events.pop_back();
-
-        request->m_callEvent(END, "req_err");
 
         close(request->m_socket);
 

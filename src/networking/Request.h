@@ -27,7 +27,7 @@ enum REQUEST_STATE : std::uint8_t
   REQUEST_WAITING_FOR_DATA,
   REQUEST_READING_HTTP,
   REQUEST_READING_BODY,
-  REQUESR_READING_CHUNKS
+  REQUEST_READING_CHUNKS
 };
 
 enum REQUEST_EVENTS : std::uint8_t
@@ -93,6 +93,7 @@ private:
   mutable std::unique_ptr<EventFunction> m_events[2];
 
   http::Parser m_parser;
+  std::string m_chunk;
 
   REQUEST_STATE m_state = REQUEST_WAITING_FOR_DATA;
 

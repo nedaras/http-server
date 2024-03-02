@@ -108,7 +108,8 @@ void Response::end() const
   m_request->m_parser = http::Parser(m_request->m_buffer.get());
   m_request->m_bufferSize = 0;
   
-  m_request->m_updateTimeout(5000);
+  m_server->m_timeouts.erase(m_request);
+  m_request->m_updateTimeout(5000); // have this bull shit wrapper in update timeoiu
   m_server->m_timeouts.push(m_request);
 
   m_responseData() = Request::ResponseData();

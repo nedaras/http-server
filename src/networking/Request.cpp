@@ -3,6 +3,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cstring>
+#include <iostream>
 #include <memory>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -28,7 +29,7 @@ void Request::on(REQUEST_EVENTS event, const EventFunction& function) const
   m_events[event] = std::make_unique<EventFunction>(function);
 }
 
-// we need correct porams for events
+// we need correct params for events
 void Request::m_callEvent(REQUEST_EVENTS event, std::string_view data) const
 {
   if (m_events[event]) (*m_events[event])(data);
@@ -96,6 +97,8 @@ ParserResponse Request::m_parse() // make even more states and rename them what 
 
     if (status != REQUEST_SUCCESS) return { status, m_firstRequest() };
 
+  //std::cout.write(m_buffer.get() + m_bufferSize, bytes);
+  //std::cout << "\n";
     m_bufferSize += bytes;
 
     switch (m_parser.parse(bytes)) // make this dude read body, parser should return how many bytes we have read till eof
@@ -117,10 +120,29 @@ ParserResponse Request::m_parse() // make even more states and rename them what 
           if (m_parser.bodyLength > body.size())
           {
 
-            m_state = REQUEST_READING_BODY;  
+            m_state = REQUEST_READING_BODY;
             break;
 
           }
+
+        }
+
+        if (m_parser.chunked)
+        {
+
+          std::size_t size = bytes - m_parser.bytesRead;
+          char* chunkStart = m_buffer.get() + m_bufferSize - bytes + m_parser.bytesRead;
+
+          m_chunk.resize(size);
+
+          std::memcpy(m_chunk.data(), chunkStart, size);
+          // TODO: we need to unhex the size, till first \r\n
+          // then we just need to recv till we get bytes as unhex value and check if contains eof
+          // then we call event on data
+         
+          //m_callEvent(DATA, m_chunk); 
+
+          //m_state = REQUEST_READING_CHUNKS; 
 
         }
 

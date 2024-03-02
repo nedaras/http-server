@@ -17,10 +17,12 @@ void Handler(const Request* request, const Response& response)
   std::string file = request->getPath() == "/" ? "index.html" : std::string(&request->getPath()[1], request->getPath().size() - 1);
   std::string extension = file.substr(file.find('.') + 1);
 
+  std::cout << request->getPath() << "\n";
+
   response.writeHead("Content-Type", "text/" + extension);
   response.writeHead("Connection", "keep-alive");
 
-  request->on(END, [request, response](std::string_view data) {
+  request->on(END, [response](std::string_view data) {
 
     response.end();
 
@@ -28,15 +30,23 @@ void Handler(const Request* request, const Response& response)
 
   // should we put body is this data thing or just send chunked data here
   request->on(DATA, [](std::string_view data) {
-
-    std::cout << data << "dt\n";
+    
+    std::cout << data << "new data\n";
 
   });
+
+  if (request->getPath() == "/post")
+  {
+
+    response.writeBody("cool!");
+  
+    return;
+  }
+
 
   if (request->getPath() == "/")
   {
 
-    //std::cout << request->body;
     //std::cout << "\nlength: " << request->body.size() << "\n"; 
 
   }

@@ -37,10 +37,11 @@ public:
   std::size_t bytesRead = 0;
   std::size_t bodyLength = 0;
 
+  bool chunked = false;
 
 private:
 
-  void m_newHeader(Header& header);
+  int m_newHeader(Header& header);
 
 private:
 
