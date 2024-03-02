@@ -240,8 +240,6 @@ int Server::listen(const char* port)
 
           m_events.push_back({});
 
-          std::cout << "new req\n";
-
           request->m_updateTimeout(60000); // we will wait one min for user to complete a request
           m_timeouts.push(request);
 
@@ -261,6 +259,7 @@ int Server::listen(const char* port)
         m_timeouts.erase(request);
         m_callback(request, Response(request, this));
 
+        // we still need some timeouts
         if (request->m_chunk.size() > 0) // we're calling inital chunk here couse we need init callbacks in request
         {
           request->m_callEvent(DATA, request->m_chunk);

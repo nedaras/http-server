@@ -2,6 +2,7 @@
 
 #include <cerrno>
 #include <chrono>
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -63,12 +64,30 @@ std::tuple<REQUEST_STATUS, ssize_t> Request::m_safeRecv(char* buffer, std::size_
 
 }
 
+static constexpr std::int8_t unhex[256] = {
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+   0, 1, 2, 3, 4, 5, 6, 7, 8, 9,-1,-1,-1,-1,-1,-1,
+  -1,10,11,12,13,14,15,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,10,11,12,13,14,15,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+};
+
 // we using same patterns not cool
 ParserResponse Request::m_parse() // make even more states and rename them what are these names
 {
    
   while (true)
   {
+
+    if (m_state == REQUEST_READING_CHUNKS)
+    {
+
+
+
+    }
 
     if (m_state == REQUEST_READING_BODY)
     {
@@ -127,20 +146,57 @@ ParserResponse Request::m_parse() // make even more states and rename them what 
 
         }
 
+        // i know its ugly, but things are just like that
         if (m_parser.chunked)
         {
 
           std::size_t size = bytes - m_parser.bytesRead;
           char* chunkStart = m_buffer.get() + m_bufferSize - bytes + m_parser.bytesRead;
 
-          m_chunk.resize(size);
+          if (size == 0) break;
 
-          std::memcpy(m_chunk.data(), chunkStart, size);
+          // ok so biggest chunk we will be handling is 0x10000, it would be smth like 10000\r\n{data}\r\n
+
+          std::uint32_t chunkSize = 0;
+          std::uint8_t i = 0;
+
+          // TODO: what is user is an hackers and sends like one byte
+          // TODO: check if first chunk is closing chunk
+          // IMAGE THAT WE HAVE 7 bytes of chars to read
+
+          while (i < 5)
+          {
+
+            std::int8_t number = unhex[static_cast<std::uint8_t>(*(chunkStart + i))];
+
+            if (number != -1)
+            {
+
+              chunkSize *= 16;
+              chunkSize += number;
+
+              i++;
+
+              continue;
+
+            }
+
+            if (i == 0) return { REQUEST_HTTP_ERROR, m_firstRequest() };
+
+            if (*(chunkStart + i) != '\r' || *(chunkStart + i + 1) != '\n') return { REQUEST_HTTP_ERROR, m_firstRequest() };
+            if (chunkSize > 0x10000) return { REQUEST_HTTP_BUFFER_ERROR, m_firstRequest() };
+
+            break;
+
+          } // she we need to remove {size}\r\n and \r\n from the chunk
+
+          m_chunk.append(chunkStart + i + 2, chunkSize);
+
+          std::cout << chunkSize << "\n";
+
           // TODO: we need to unhex the size, till first \r\n
           // then we just need to recv till we get bytes as unhex value and check if contains eof
           // then we call event on data
-         
-          //m_callEvent(DATA, m_chunk); 
 
           //m_state = REQUEST_READING_CHUNKS; 
 
