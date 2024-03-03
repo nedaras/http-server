@@ -263,6 +263,8 @@ int Server::listen(const char* port)
           m_timeouts.erase(request);
           m_callback(request, Response(request, this));
 
+          request->m_callEvent(END, "end");
+
           goto CONTINUE;
         case REQUEST_CHUNK_COMPLETE:
 
@@ -282,6 +284,9 @@ int Server::listen(const char* port)
 
           goto CONTINUE;
         case REQUEST_CHUNK_END:
+
+          request->m_callEvent(END, "chunk_end");
+
           goto CONTINUE;
         case REQUEST_INCOMPLETE:
           if (newRequest)
@@ -297,12 +302,14 @@ int Server::listen(const char* port)
         case REQUEST_ERROR:
         case REQUEST_CHUNK_ERROR:
 
+          if (status != REQUEST_CLOSE) std::cout << "ERR " << status << "\n";
+
           if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
+
+          request->m_callEvent(END, "end");
 
           m_timeouts.erase(request);
           m_events.pop_back();
-
-          request->m_callEvent(END, "end");
 
           close(request->m_socket);
 

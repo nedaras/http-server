@@ -155,9 +155,10 @@ LOOP:
 
           m_chunk.append(chunkStart + i + 2, chunkSize);
 
+          ParserResponse response { REQUEST_CHUNK_COMPLETE, m_firstRequest() };
           m_state = REQUEST_READING_CHUNKS; 
 
-          return { REQUEST_CHUNK_COMPLETE, m_firstRequest() }; 
+          return response; 
 
         }
 
@@ -193,79 +194,25 @@ LOOP:
     goto LOOP;
   }
   case REQUEST_READING_CHUNKS:
-    std::cout << "f idk what todo\n";
-    return { REQUEST_CLOSE, m_firstRequest() };
+
+    //we need to handle this shit
+
+    char buf[512];
+    ssize_t bytes = recv(m_socket, buf, 512, 0);
+
+    if (bytes == -1) return { REQUEST_INCOMPLETE, m_firstRequest() };
+
+    ParserResponse response = { REQUEST_CHUNK_END, m_firstRequest() };
+    m_state = REQUEST_WAITING_FOR_DATA;
+ 
+    std::cout << "f idk what todo: " << bytes << "\n";
+
+    return response;
   }
   
 
   std::cout << "how are we here?\n";
   return { REQUEST_CLOSE, m_firstRequest() };
-
-    //if (m_state == REQUEST_READING_CHUNKS)
-    //{
-
-      //char buffer[5 + 2 + 0x10000 + 2];
-      //ssize_t bytes = recv(m_socket, buffer, 5 + 2 + 0x10000 + 2, 0);
-
-      //if (bytes == 0) return { REQUEST_CLOSE, m_firstRequest() };
-      //if (bytes == -1)
-      //{
-
-        //if (errno == EWOULDBLOCK) return { REQUEST_CHUNK_INCOMPLETE, m_firstRequest() };
-        //return { REQUEST_ERROR, m_firstRequest() };
-
-      //}
-
-      //std::uint32_t chunkSize = 0;
-      //std::uint8_t i = 0;
-
-      // TODO: what is user is an hackers and sends like one byte
-      // TODO: check if first chunk is closing chunk
-      // IMAGE THAT WE HAVE 7 bytes of chars to read
-      //while (i < 5)
-      //{
-
-        //std::int8_t number = unhex[static_cast<std::uint8_t>(*(buffer + i))];
-
-        //if (number != -1)
-        //{
-
-          //chunkSize *= 16;
-          //chunkSize += number;
-
-          //i++;
-
-          //continue;
-
-        //}
-
-        //if (i == 0) return { REQUEST_HTTP_ERROR, m_firstRequest() };
-
-        // TODO: we need to see the sizes
-        //if (*(buffer + i) != '\r' || *(buffer + i + 1) != '\n') return { REQUEST_HTTP_ERROR, m_firstRequest() };
-        //if (chunkSize > 0x10000) return { REQUEST_HTTP_BUFFER_ERROR, m_firstRequest() };
-
-        //break;
-
-      //} // she we need to remove {size}\r\n and \r\n from the chunk
-
-      //if (chunkSize == 0)
-      //{
-
-        //std::cout << "we tryna end\n";
-
-        //m_state = REQUEST_WAITING_FOR_DATA;
-
-        //return { REQUEST_CHUNK_END, m_firstRequest() }; // need state for chunked received
-
-      //}
-
-      // idk we need to handle if they send like half of chunk
-      //m_callEvent(DATA, std::string_view(buffer + i + 2, chunkSize));
-
-      //continue;
-
-    //}
 
 }
 
