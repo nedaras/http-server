@@ -250,71 +250,75 @@ int Server::listen(const char* port)
       }
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
-      auto [ status, newRequest ] = request->m_parse(); // lets make this http 1.1, it means that we handle chunks and other http requests
 
-      switch (status)
+      while (true)
       {
-      case REQUEST_SUCCESS:
 
-        m_timeouts.erase(request);
-        m_callback(request, Response(request, this));
+        auto [ status, newRequest ] = request->m_parse(); // lets make this http 1.1, it means that we handle chunks and other http requests
 
-        // we still need some timeouts
-        if (request->m_chunk.size() > 0) // we're calling inital chunk here couse we need init callbacks in request
+        switch (status)
         {
+        case REQUEST_HTTP_COMPLETE:
+
+          m_timeouts.erase(request);
+          m_callback(request, Response(request, this));
+
+          goto CONTINUE;
+        case REQUEST_CHUNK_COMPLETE:
+
+          if (newRequest) // if chunk complete and new req it means we skipped the REQUEST_HTTP_COMPLETE
+          {
+
+            m_timeouts.erase(request);
+            m_callback(request, Response(request, this));
+
+          }
+
           request->m_callEvent(DATA, request->m_chunk);
+
+          m_timeouts.erase(request);
+          request->m_updateTimeout(60000);
+          m_timeouts.push(request);
+
+          goto CONTINUE;
+        case REQUEST_CHUNK_END:
+          goto CONTINUE;
+        case REQUEST_INCOMPLETE:
+          if (newRequest)
+          {
+            m_timeouts.erase(request);
+            request->m_updateTimeout(60000);
+            m_timeouts.push(request);
+          }
+          break;
+        case REQUEST_CLOSE:
+        case REQUEST_HTTP_ERROR:
+        case REQUEST_HTTP_BUFFER_ERROR:
+        case REQUEST_ERROR:
+        case REQUEST_CHUNK_ERROR:
+
+          if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
+
+          m_timeouts.erase(request);
+          m_events.pop_back();
+
+          request->m_callEvent(END, "end");
+
+          close(request->m_socket);
+
+          delete request;
+
+          break;
         }
-
-        request->m_callEvent(END, "end");
-        //if (!request->m_parser.chunked) request->m_callEvent(END, "end"); // how to know if were like waiting for data or sun, if it chunked,
-                                                                          // then we should call end at 0\r\n\r\n chunk or from timeout
-
-        break;
-      case REQUEST_INCOMPLETE:
-        std::cout << "REQUEST_INCOMPLETE\n";
-        if (!newRequest) break;
-
-        m_timeouts.erase(request);
-        request->m_updateTimeout(60000);
-        m_timeouts.push(request);
-
-        break;
-      case REQUEST_CLOSE:
-        std::cout << "REQUEST_CLOSE\n"; 
-        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
-
-        m_timeouts.erase(request);
-        m_events.pop_back();
         
-        request->m_callEvent(END, "close");
-
-        close(request->m_socket);
-
-        delete request;
-
         break;
-      default: // idk how to send a response if client is still sending data, mb that is not our falt, though some response would be nice
-               // but is it dumb to rech bytes that we know will be thrown in trash
-        std::cout << "REQUEST_DEFAULT_CASE_ERROR: " << status << "\n";
-        if (status == REQUEST_ERROR) PRINT_ERROR("Request::parse", 0); // there are some errors which are like close
 
-        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
+CONTINUE:
 
-        //const char* response = "HTTP/1.1 413 Request Entity Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        // enable c++ 23
 
-        //send(request->m_socket, response, strlen(response), 0);
+        std::cout << "c\n";
 
-        // as err event
-        request->m_callEvent(END, "req_err");
-        
-        m_timeouts.erase(request);
-        m_events.pop_back();
-
-        close(request->m_socket);
-
-        delete request;
-
-        break;
       }
 
     }

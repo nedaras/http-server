@@ -6,6 +6,7 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+#include <string_view>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <tuple>
@@ -20,7 +21,7 @@ Request::Request(int socket)
 
 void Request::m_updateTimeout(unsigned long milliseconds)
 {
-
+  
   m_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) + std::chrono::milliseconds(milliseconds);
 
 }
@@ -60,7 +61,7 @@ std::tuple<REQUEST_STATUS, ssize_t> Request::m_safeRecv(char* buffer, std::size_
 
   }
 
-  return std::make_tuple(REQUEST_SUCCESS, bytes);
+  return std::make_tuple(REQUEST_HTTP_COMPLETE, bytes); // it just means that ye we did it
 
 }
 
@@ -78,49 +79,23 @@ static constexpr std::int8_t unhex[256] = {
 // we using same patterns not cool
 ParserResponse Request::m_parse() // make even more states and rename them what are these names
 {
-   
-  while (true)
+
+LOOP:
+
+  switch (m_state)
   {
-
-    if (m_state == REQUEST_READING_CHUNKS)
-    {
-
-
-
-    }
-
-    if (m_state == REQUEST_READING_BODY)
-    {
-         
-      auto [ status, bytes ] = m_safeRecv(body.data(), body.size(), body.capacity());
-
-      if (status != REQUEST_SUCCESS) return { status, m_firstRequest() };
-
-      body.resize(body.size() + bytes);
-
-      if (body.capacity() == body.size())
-      {
-
-        ParserResponse response { REQUEST_SUCCESS, m_firstRequest() };
-        m_state = REQUEST_WAITING_FOR_DATA;
-
-        return response;
-
-      }
-
-      continue;
-
-    }
+  case REQUEST_WAITING_FOR_DATA:
+  case REQUEST_READING_HTTP:
+  {
 
     auto [ status, bytes ] = m_safeRecv(m_buffer.get(), m_bufferSize, m_bufferLength);
 
-    if (status != REQUEST_SUCCESS) return { status, m_firstRequest() };
+    if (status != REQUEST_HTTP_COMPLETE) return { status, m_firstRequest() };
 
-  //std::cout.write(m_buffer.get() + m_bufferSize, bytes);
-  //std::cout << "\n";
+    std::string_view unhandledBytes = std::string_view(m_buffer.get() + m_bufferSize + m_parser.bytesRead, bytes - m_parser.bytesRead);
     m_bufferSize += bytes;
 
-    switch (m_parser.parse(bytes)) // make this dude read body, parser should return how many bytes we have read till eof
+    switch (m_parser.parse(bytes))
     {
     case 0: // EOF REACHED
       {
@@ -129,24 +104,18 @@ ParserResponse Request::m_parse() // make even more states and rename them what 
         {
 
           body.reserve(m_parser.bodyLength);
-          body.resize(bytes - m_parser.bytesRead);
-
-          // bro aint cool
-          char* bodyStart = m_buffer.get() + m_bufferSize - bytes + m_parser.bytesRead;
-
-          std::memcpy(body.data(), bodyStart, body.size());
+          body.append(unhandledBytes);
 
           if (m_parser.bodyLength > body.size())
           {
 
             m_state = REQUEST_READING_BODY;
-            break;
+            goto LOOP;
 
           }
 
         }
 
-        // i know its ugly, but things are just like that
         if (m_parser.chunked)
         {
 
@@ -155,14 +124,8 @@ ParserResponse Request::m_parse() // make even more states and rename them what 
 
           if (size == 0) break;
 
-          // ok so biggest chunk we will be handling is 0x10000, it would be smth like 10000\r\n{data}\r\n
-
           std::uint32_t chunkSize = 0;
           std::uint8_t i = 0;
-
-          // TODO: what is user is an hackers and sends like one byte
-          // TODO: check if first chunk is closing chunk
-          // IMAGE THAT WE HAVE 7 bytes of chars to read
 
           while (i < 5)
           {
@@ -188,31 +151,121 @@ ParserResponse Request::m_parse() // make even more states and rename them what 
 
             break;
 
-          } // she we need to remove {size}\r\n and \r\n from the chunk
+          }
 
           m_chunk.append(chunkStart + i + 2, chunkSize);
 
-          std::cout << chunkSize << "\n";
+          m_state = REQUEST_READING_CHUNKS; 
 
-          // TODO: we need to unhex the size, till first \r\n
-          // then we just need to recv till we get bytes as unhex value and check if contains eof
-          // then we call event on data
-
-          //m_state = REQUEST_READING_CHUNKS; 
+          return { REQUEST_CHUNK_COMPLETE, m_firstRequest() }; 
 
         }
 
-        ParserResponse response { REQUEST_SUCCESS, m_firstRequest() };
+        ParserResponse response { REQUEST_HTTP_COMPLETE, m_firstRequest() };
         m_state = REQUEST_WAITING_FOR_DATA;
 
         return response;
       }
-    case 1: // EOF NOT REACHED
-      break;
+    case 1:
+      m_state = REQUEST_READING_HTTP;
+      goto LOOP;
     default: return { REQUEST_HTTP_ERROR, m_firstRequest() };
     }
 
   }
+  case REQUEST_READING_BODY:
+  {
+    auto [ status, bytes ] = m_safeRecv(body.data(), body.size(), body.capacity());
+
+    if (status != REQUEST_HTTP_COMPLETE) return { status, m_firstRequest() };
+
+    body.resize(body.size() + bytes);
+
+    if (body.capacity() == body.size())
+    {
+
+      ParserResponse response { REQUEST_HTTP_COMPLETE, m_firstRequest() };
+      m_state = REQUEST_WAITING_FOR_DATA;
+
+      return response;
+
+    }
+    goto LOOP;
+  }
+  case REQUEST_READING_CHUNKS:
+    std::cout << "f idk what todo\n";
+    return { REQUEST_CLOSE, m_firstRequest() };
+  }
+  
+
+  std::cout << "how are we here?\n";
+  return { REQUEST_CLOSE, m_firstRequest() };
+
+    //if (m_state == REQUEST_READING_CHUNKS)
+    //{
+
+      //char buffer[5 + 2 + 0x10000 + 2];
+      //ssize_t bytes = recv(m_socket, buffer, 5 + 2 + 0x10000 + 2, 0);
+
+      //if (bytes == 0) return { REQUEST_CLOSE, m_firstRequest() };
+      //if (bytes == -1)
+      //{
+
+        //if (errno == EWOULDBLOCK) return { REQUEST_CHUNK_INCOMPLETE, m_firstRequest() };
+        //return { REQUEST_ERROR, m_firstRequest() };
+
+      //}
+
+      //std::uint32_t chunkSize = 0;
+      //std::uint8_t i = 0;
+
+      // TODO: what is user is an hackers and sends like one byte
+      // TODO: check if first chunk is closing chunk
+      // IMAGE THAT WE HAVE 7 bytes of chars to read
+      //while (i < 5)
+      //{
+
+        //std::int8_t number = unhex[static_cast<std::uint8_t>(*(buffer + i))];
+
+        //if (number != -1)
+        //{
+
+          //chunkSize *= 16;
+          //chunkSize += number;
+
+          //i++;
+
+          //continue;
+
+        //}
+
+        //if (i == 0) return { REQUEST_HTTP_ERROR, m_firstRequest() };
+
+        // TODO: we need to see the sizes
+        //if (*(buffer + i) != '\r' || *(buffer + i + 1) != '\n') return { REQUEST_HTTP_ERROR, m_firstRequest() };
+        //if (chunkSize > 0x10000) return { REQUEST_HTTP_BUFFER_ERROR, m_firstRequest() };
+
+        //break;
+
+      //} // she we need to remove {size}\r\n and \r\n from the chunk
+
+      //if (chunkSize == 0)
+      //{
+
+        //std::cout << "we tryna end\n";
+
+        //m_state = REQUEST_WAITING_FOR_DATA;
+
+        //return { REQUEST_CHUNK_END, m_firstRequest() }; // need state for chunked received
+
+      //}
+
+      // idk we need to handle if they send like half of chunk
+      //m_callEvent(DATA, std::string_view(buffer + i + 2, chunkSize));
+
+      //continue;
+
+    //}
 
 }
 
