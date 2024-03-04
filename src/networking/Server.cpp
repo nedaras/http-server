@@ -134,7 +134,8 @@ int Server::listen(const char* port)
     epoll_event* events = m_events.data();
     std::size_t eventSize = m_events.size();
 
-    int epolls = epoll_wait(m_epoll, events, eventSize, timeout);
+    // imagine if event size was 2,147,483,647 + 1, so it will make event size equal to 0, wthat should we do.
+    int epolls = epoll_wait(m_epoll, events, static_cast<int>(eventSize), static_cast<int>(timeout));
 
     if (epolls == 0)
     {

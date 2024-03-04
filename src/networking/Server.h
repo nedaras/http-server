@@ -14,8 +14,7 @@ class Server
 
 public:
 
-  // is move good?
-  Server(const std::function<void(const Request* request, const Response& response)>& m_callback) : m_callback(std::move(m_callback)) {}
+  Server(const std::function<void(const Request* request, const Response& response)>& callback) : m_callback(callback) {}
 
   int listen(const char* port);
 

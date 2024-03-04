@@ -174,6 +174,7 @@ LOOP:
     }
 
   }
+  break;
   case REQUEST_READING_BODY:
   {
     auto [ status, bytes ] = m_safeRecv(body.data(), body.size(), body.capacity());

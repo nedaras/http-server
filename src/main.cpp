@@ -1,7 +1,9 @@
 #include "networking/Server.h"
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <string_view>
 
@@ -22,7 +24,7 @@ void Handler(const Request* request, const Response& response)
   response.writeHead("Content-Type", "text/" + extension);
   response.writeHead("Connection", "keep-alive");
 
-  request->on(END, [response](std::string_view data) {
+  request->on(END, [response](std::string_view) {
 
     response.end();
 
