@@ -62,6 +62,11 @@ public:
     return m_parser.path;
   }
 
+  constexpr std::string_view getMethod() const
+  {
+    return m_parser.method;
+  }
+
   using EventFunction = std::function<void(std::string_view data)>;
   void on(REQUEST_EVENTS event, const EventFunction& function) const;
 

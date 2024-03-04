@@ -1,16 +1,20 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>HTML Page</title>
-  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
 </head>
 <body>
+  <button
+    hx-get="/api/hello.html"
+    hx-swap="beforeend"
+    hx-target=".list">
+
+    Click me!
+  </button>
+
+  <ul class="list">
+    <li>Item 1</li>
+    <li>Item 2</li>
+  </ul>
 </body>
-  <form action="/" method="post" >
-    <input type="text" name="txt">
-    <button type="submit" value="fullsend" >
-      SEND
-    </button>
-  </form>
-  <script src="main.js"></script>
 </html>

@@ -1,9 +1,7 @@
 #include "networking/Server.h"
 #include <array>
-#include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <limits>
 #include <string>
 #include <string_view>
 
@@ -17,9 +15,7 @@ void Handler(const Request* request, const Response& response)
 {
 
   std::string file = request->getPath() == "/" ? "index.html" : std::string(&request->getPath()[1], request->getPath().size() - 1);
-  std::string extension = file.substr(file.find('.') + 1);
-
-  std::cout << request->getPath() << "\n";
+  std::string extension = file.substr(file.find('.') + 1); // bad :)
 
   response.writeHead("Content-Type", "text/" + extension);
   response.writeHead("Connection", "keep-alive");
@@ -30,29 +26,22 @@ void Handler(const Request* request, const Response& response)
 
   });
 
+  if (request->getMethod() == "POST")
+  {
+
+    response.writeBody("<p>POST</p>");
+
+    return;
+
+  }
+
   // should we put body is this data thing or just send chunked data here
   request->on(DATA, [](std::string_view data) {
     
     std::cout << data << "new data\n";
 
   });
-
-  if (request->getPath() == "/post")
-  {
-
-    response.writeBody("cool!");
   
-    return;
-  }
-
-
-  if (request->getPath() == "/")
-  {
-
-    //std::cout << "\nlength: " << request->body.size() << "\n"; 
-
-  }
-
   if (!fs::exists(publicDir / file))
   {
 

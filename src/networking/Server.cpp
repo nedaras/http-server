@@ -325,7 +325,9 @@ CONTINUE:
 
         // enable c++ 23
 
-        std::cout << "c\n";
+        //std::cout << "c\n";
+
+        void();
 
       }
 
