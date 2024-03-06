@@ -23,6 +23,13 @@ void Response::writeHead(std::string_view key, std::string_view value) const
     m_responseData().headSent = true;
   }
 
+  if (key == "Connection")
+  {
+
+    m_request->m_responseData.keepAlive = value == "keep-alive";
+
+  }
+
   send(m_request->m_socket, key.data(), key.size(), 0);
   send(m_request->m_socket, ": ", 2, 0);
   send(m_request->m_socket, value.data(), value.size(), 0);
@@ -89,14 +96,21 @@ void Response::write(const char* buffer, std::size_t size) const
 void Response::writeBody(std::string_view buffer) const
 {
 
+  writeBody(buffer.data(), buffer.size());
+
+}
+
+void Response::writeBody(const char* buffer, std::size_t size) const
+{
+
   if (!m_responseData().contentLengthSent)
   {
-    writeHead("Content-Length", std::to_string(buffer.size()));
+    writeHead("Content-Length", std::to_string(size));
     m_responseData().contentLengthSent = true;
   }
-  
+
   send(m_request->m_socket, "\r\n", 2, 0);
-  send(m_request->m_socket, buffer.data(), buffer.size(), 0);
+  send(m_request->m_socket, buffer, size, 0);
 
 }
 
@@ -107,7 +121,7 @@ void Response::end() const
 
   m_request->m_parser = http::Parser(m_request->m_buffer.get());
   m_request->m_bufferSize = 0;
-  
+
   m_server->m_timeouts.erase(m_request);
   m_request->m_updateTimeout(5000); // have this bull shit wrapper in update timeoiu
   m_server->m_timeouts.push(m_request);

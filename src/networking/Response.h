@@ -17,6 +17,7 @@ public:
   void write(const char* buffer, std::size_t size) const;
 
   void writeBody(std::string_view buffer) const;
+  void writeBody(const char* buffer, std::size_t size) const;
 
   void end() const;
 

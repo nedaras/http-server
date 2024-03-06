@@ -111,9 +111,10 @@ private:
 
   struct ResponseData
   {
-    bool headSent = false;
-    bool chunkSent = false;
-    bool contentLengthSent = false;
+    bool keepAlive : 1;
+    bool headSent : 1;
+    bool chunkSent : 1;
+    bool contentLengthSent : 1;
   };
 
   ResponseData m_responseData;

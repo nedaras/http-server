@@ -1,68 +1,47 @@
 #include "networking/Server.h"
-#include <array>
-#include <filesystem>
 #include <fstream>
-#include <string>
-#include <string_view>
+#include <memory>
 
-namespace fs = std::filesystem;
+// TODO: add like default not found behavior
+// TODO: handle conection close
 
-static fs::path publicDir;
-
-// we aint handling close connection
 // we will add ssh
+//
+//
+// TODO: auth
 void Handler(const Request* request, const Response& response)
 {
 
-  std::string file = request->getPath() == "/" ? "index.html" : std::string(&request->getPath()[1], request->getPath().size() - 1);
-  std::string extension = file.substr(file.find('.') + 1); // bad :)
+  if (request->getPath() == "/")
+  {
 
-  response.writeHead("Content-Type", "text/" + extension);
-  response.writeHead("Connection", "keep-alive");
+    response.writeHead("Connection", "keep-alive");
+    response.writeHead("Content-Type", "text/html");
 
-  request->on(END, [response](std::string_view) {
+    std::ifstream stream("/home/nedas/source/http-server/index.html");
+
+    stream.seekg(0, std::ios::end);
+    std::size_t size = stream.tellg();
+    stream.seekg(0, std::ios::beg);
+
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(size);
+    stream.read(buffer.get(), size);
+
+    response.writeBody(buffer.get(), size);
 
     response.end();
 
-  });
-
-  if (request->getMethod() == "POST")
-  {
-
-    response.writeBody("<p>POST</p>");
-
-    return;
-
   }
 
-  // should we put body is this data thing or just send chunked data here
-  request->on(DATA, [](std::string_view data) {
+  if (request->getPath() == "/api/server")
+  {
     
-    std::cout << data << "new data\n";
+    response.writeHead("Connection", "keep-alive");
+    response.writeHead("Content-Type", "text/html");
 
-  });
-  
-  if (!fs::exists(publicDir / file))
-  {
+    response.writeBody("<h1>Server Component!</h1>");
 
-    response.writeBody("no file brah");
-
-    return;
-
-  }
-
-  response.writeHead("Transfer-Encoding", "chunked");
-
-  std::ifstream stream(publicDir / file);
-  std::array<char, 0x1000> buffer;
-  
-  while (!stream.eof())
-  {
-
-    stream.read(buffer.data(), buffer.size());
-    ssize_t length = stream.gcount();
-
-    if (length > 0) response.write(buffer.data(), length);
+    response.end();
 
   }
 
@@ -71,13 +50,9 @@ void Handler(const Request* request, const Response& response)
 int main()
 {
 
-  publicDir = fs::read_symlink("/proc/self/exe").parent_path().parent_path().parent_path() / "public";
-
   Server server(Handler);
 
   server.listen("3000");
-
-  return 0;
 
 }
 

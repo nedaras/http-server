@@ -252,6 +252,7 @@ int Server::listen(const char* port)
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
 
+      // TODO: when calling end event we need to check if con is set to close if it is pop the request
       while (true)
       {
 
