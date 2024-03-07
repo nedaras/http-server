@@ -26,6 +26,7 @@ public:
   Parser() : m_buffer(nullptr), m_unhandledBuffer(nullptr) {};
 
   int parse(std::size_t bytes);
+  int parseChunk(char* buffer, std::size_t bytes);
 
 public:
 
@@ -69,11 +70,25 @@ private:
     REQUEST_EOF
   };
 
+  enum CHUNK_STATE
+  {
+    REQUEST_CHUNK_SIZE,
+    REQUEST_CHUNK_BEGIN,
+    REQUEST_CHUNK_BODY,
+    REQUEST_CHUNK_END_CR,
+    REQUEST_CHUNK_END_LF
+  };
+
   char* m_buffer;
   char* m_unhandledBuffer;
 
   Header m_header;
+
+  std::uint32_t m_chunkSize = 0;
+  std::size_t m_chunkSizeReceived = 0;
+
   STATE m_state = REQUEST_METHOD;
+  CHUNK_STATE m_chunkState = REQUEST_CHUNK_SIZE;
 
 };
 

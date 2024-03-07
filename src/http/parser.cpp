@@ -72,6 +72,17 @@ static constexpr bool IS_URL_CHAR(char c)
   return url_tokens[static_cast<std::uint8_t>(c) >> 3] & (1 << (static_cast<std::uint8_t>(c) & 7));
 }
 
+static constexpr std::int8_t unhex[256] = {
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+   0, 1, 2, 3, 4, 5, 6, 7, 8, 9,-1,-1,-1,-1,-1,-1,
+  -1,10,11,12,13,14,15,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,10,11,12,13,14,15,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+};
+
 static std::int32_t toNumber(std::string_view buffer)
 {
 
@@ -260,6 +271,70 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
     }
   
     m_buffer++;
+
+  }
+
+  return 1;
+
+}
+
+
+int http::Parser::parseChunk(char* buffer, std::size_t bytes) // we need this chunk buffer to be global
+{
+  
+  char* end = &buffer[bytes];
+
+  std::size_t unhandledBytes = bytes;
+
+  while (buffer != end)
+  {
+
+    char c = *buffer;
+
+    switch (m_chunkState)
+    {
+    case REQUEST_CHUNK_SIZE:
+      if (c == '\r')
+      {
+        m_chunkState = REQUEST_CHUNK_BEGIN;
+        break;
+      }
+      if (unhex[static_cast<std::uint8_t>(c)] == -1) return -1;
+    
+      m_chunkSize *= 16;
+      m_chunkSize += unhex[static_cast<std::uint8_t>(c)];
+
+      if (m_chunkSize > 0x10000) return -1;
+      break;
+    case REQUEST_CHUNK_BEGIN:
+      if (c != '\n') return -1;
+      unhandledBytes = end - buffer;
+      m_chunkState = REQUEST_CHUNK_BODY;
+      break;
+    case REQUEST_CHUNK_BODY:
+      m_chunkSizeReceived += unhandledBytes;
+
+      if (m_chunkSizeReceived >= m_chunkSize)
+      {
+
+        m_chunkState = REQUEST_CHUNK_END_CR;
+        buffer += m_chunkSizeReceived - m_chunkSize - 1;
+        break;
+
+      }
+
+      buffer += unhandledBytes - 1;
+      break;
+    case REQUEST_CHUNK_END_CR:
+      if (c != '\r') return -1;
+      m_chunkState = REQUEST_CHUNK_END_LF;
+      break;
+    case REQUEST_CHUNK_END_LF:
+      if (c != '\n') return -1;
+      return 0; // return total bytes read, couse u know it can be another chunk after this one
+    }
+
+    buffer++;
 
   }
 
