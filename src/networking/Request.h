@@ -100,9 +100,7 @@ private:
   mutable std::unique_ptr<EventFunction> m_events[2];
 
   http::Parser m_parser;
-
   std::string m_chunk;
-  std::size_t m_chunkSentSize;
 
   REQUEST_STATE m_state = REQUEST_WAITING_FOR_DATA;
 

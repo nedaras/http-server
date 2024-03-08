@@ -5,6 +5,7 @@
 #include <iostream>
 #include <cerrno>
 #include <cstring>
+#include <string_view>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -265,7 +266,7 @@ int Server::listen(const char* port)
           m_timeouts.erase(request);
           m_callback(request, Response(request, this));
 
-          request->m_callEvent(END, "end_r");
+          request->m_callEvent(END, "end_r"); // NOTE: we can only cal end we aint like accepting chunks or sum
 
           goto CONTINUE;
         case REQUEST_CHUNK_COMPLETE:
@@ -278,13 +279,23 @@ int Server::listen(const char* port)
 
           }
 
-          request->m_callEvent(DATA, "data");
+          if (request->m_parser.chunkSize > 0) // this can be set to zero if inited  request just closes the request
+          {
 
-          m_timeouts.erase(request);
-          request->m_updateTimeout(60000);
-          m_timeouts.push(request);
+            char* start = request->m_chunk.data() + request->m_parser.chunkSizeChars + 2;
+            std::size_t size = request->m_chunk.size() - 2 - request->m_parser.chunkSizeChars - 2;
 
-          request->m_parser.chunkSize = 0;
+            request->m_callEvent(DATA, std::string_view(start, size));
+
+            m_timeouts.erase(request);
+            request->m_updateTimeout(60000);
+            m_timeouts.push(request);
+
+            goto CONTINUE;
+
+          }
+
+          request->m_callEvent(END, "end_no_wait");
 
           goto CONTINUE;
         case REQUEST_CHUNK_END:

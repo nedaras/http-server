@@ -116,7 +116,7 @@ LOOP:
 
         }
 
-        if (m_parser.chunked)
+        if (m_parser.chunked) // what if they sent data like 3\r\n123\r\n4\r\n1234\r\n we will ignore the second chunk
         {
 
           std::size_t size = bytes - m_parser.bytesRead;
@@ -124,17 +124,24 @@ LOOP:
 
           if (size == 0) break;
 
-          bool f = m_firstRequest();
+          bool firstRequest = m_firstRequest();
           m_state = REQUEST_READING_CHUNK;
 
-          // handle that 0 chunk
           switch (m_parser.parseChunk(chunkStart, size))
           {
           case 0:
-            return { REQUEST_CHUNK_COMPLETE, f };
+            
+            m_chunk.append(chunkStart, 2 + m_parser.chunkSizeChars + m_parser.chunkSize + 2);
+
+            return { m_parser.chunkSize == 0 ? REQUEST_CHUNK_END : REQUEST_CHUNK_COMPLETE, firstRequest };
           case 1:
+            if (m_parser.chunkSize > 0)
+            {
+              m_chunk.reserve(2 + m_parser.chunkSizeChars + m_parser.chunkSize + 2);
+              m_chunk.append(chunkStart, size);
+            }
             goto LOOP;
-          default: return { REQUEST_CHUNK_ERROR, f };
+          default: return { REQUEST_CHUNK_ERROR, firstRequest };
           }
 
         }
@@ -174,21 +181,21 @@ LOOP:
   case REQUEST_READING_CHUNK:
     //we need to handle this shit
 
-    char buf[512];
-    ssize_t bytes = recv(m_socket, buf, 512, 0);
+    //ssize_t bytes = recv(m_socket, m_chunk.data() + m_chunk.size(), m_chunk.capacity() - m_chunk.size(), 0);
 
-    if (bytes == 0) return { REQUEST_CLOSE, m_firstRequest() };
-    if (bytes == -1) return { REQUEST_INCOMPLETE, m_firstRequest() }; // handle errs
+    //m_chunk.resize(m_chunk.size() + bytes);
+
+    //if (bytes == 0) return { REQUEST_CLOSE, m_firstRequest() };
+    //if (bytes == -1) return { REQUEST_INCOMPLETE, m_firstRequest() }; // handle errs
     
-    switch (m_parser.parseChunk(buf, bytes))
-
-    {
-      case 0:
-        return { m_parser.chunkSize == 0 ? REQUEST_CHUNK_END : REQUEST_CHUNK_COMPLETE, m_firstRequest() };
-      case 1:
-        goto LOOP;
-      default: return { REQUEST_CHUNK_ERROR, m_firstRequest() };
-    }
+    //switch (m_parser.parseChunk(m_chunk.data() + m_chunk.size() - bytes, bytes))
+    //{
+      //case 0:
+        //return { m_parser.chunkSize == 0 ? REQUEST_CHUNK_END : REQUEST_CHUNK_COMPLETE, m_firstRequest() };
+      //case 1:
+        //goto LOOP;
+      //default: return { REQUEST_CHUNK_ERROR, m_firstRequest() };
+    //}
 
     //ParserResponse response = { REQUEST_CHUNK_END, m_firstRequest() };
     //m_state = REQUEST_WAITING_FOR_DATA;

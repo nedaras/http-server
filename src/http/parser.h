@@ -39,7 +39,9 @@ public:
   std::size_t bodyLength = 0;
 
   bool chunked = false;
+
   std::uint32_t chunkSize = 0;
+  std::uint8_t chunkSizeChars = 0;
 
 private:
 
@@ -85,6 +87,9 @@ private:
 
   Header m_header;
 
+
+  std::uint32_t m_chunkSize = 0;
+  std::uint8_t m_chunkSizeChars = 0;
   std::size_t m_chunkSizeReceived = 0;
 
   STATE m_state = REQUEST_METHOD;
