@@ -283,7 +283,6 @@ int http::Parser::parseChunk(char* buffer, std::size_t bytes) // we need this ch
 {
   
   char* end = &buffer[bytes];
-
   std::size_t unhandledBytes = bytes;
 
   while (buffer != end)
@@ -299,26 +298,30 @@ int http::Parser::parseChunk(char* buffer, std::size_t bytes) // we need this ch
         m_chunkState = REQUEST_CHUNK_BEGIN;
         break;
       }
-      if (unhex[static_cast<std::uint8_t>(c)] == -1) return -1;
-    
-      m_chunkSize *= 16;
-      m_chunkSize += unhex[static_cast<std::uint8_t>(c)];
 
-      if (m_chunkSize > 0x10000) return -1;
+      if (unhex[static_cast<std::uint8_t>(c)] == -1) return -1;
+
+      chunkSize *= 16;
+      chunkSize += unhex[static_cast<std::uint8_t>(c)];
+
+      if (chunkSize > 0x10000) return -1;
       break;
     case REQUEST_CHUNK_BEGIN:
       if (c != '\n') return -1;
-      unhandledBytes = end - buffer;
+      unhandledBytes = end - buffer - 1; // -1 couse we handle current byte
       m_chunkState = REQUEST_CHUNK_BODY;
       break;
     case REQUEST_CHUNK_BODY:
       m_chunkSizeReceived += unhandledBytes;
 
-      if (m_chunkSizeReceived >= m_chunkSize)
+      if (m_chunkSizeReceived >= chunkSize)
       {
 
+
         m_chunkState = REQUEST_CHUNK_END_CR;
-        buffer += m_chunkSizeReceived - m_chunkSize - 1;
+        if (chunkSize == 0) buffer--;
+        else buffer += chunkSize - 1;
+        
         break;
 
       }
@@ -331,6 +334,8 @@ int http::Parser::parseChunk(char* buffer, std::size_t bytes) // we need this ch
       break;
     case REQUEST_CHUNK_END_LF:
       if (c != '\n') return -1;
+      m_chunkState = REQUEST_CHUNK_SIZE;
+      m_chunkSizeReceived = 0;
       return 0; // return total bytes read, couse u know it can be another chunk after this one
     }
 

@@ -265,7 +265,7 @@ int Server::listen(const char* port)
           m_timeouts.erase(request);
           m_callback(request, Response(request, this));
 
-          request->m_callEvent(END, "end_r");
+          request->m_callEvent(END, "end");
 
           goto CONTINUE;
         case REQUEST_CHUNK_COMPLETE:
@@ -283,7 +283,9 @@ int Server::listen(const char* port)
           m_timeouts.erase(request);
           request->m_updateTimeout(60000);
           m_timeouts.push(request);
+  
 
+          if (request->m_parser.chunkSize == 0) request->m_callEvent(END, "end");
           request->m_parser.chunkSize = 0;
 
           goto CONTINUE;
@@ -310,7 +312,7 @@ int Server::listen(const char* port)
 
           if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
 
-          request->m_callEvent(END, "end_e");
+          request->m_callEvent(END, "end");
 
           m_timeouts.erase(request);
           m_events.pop_back();

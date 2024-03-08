@@ -124,41 +124,18 @@ LOOP:
 
           if (size == 0) break;
 
-          std::uint32_t chunkSize = 0;
-          std::uint8_t i = 0;
+          bool f = m_firstRequest();
+          m_state = REQUEST_READING_CHUNK;
 
-          while (i < 5)
+          // handle that 0 chunk
+          switch (m_parser.parseChunk(chunkStart, size))
           {
-
-            std::int8_t number = unhex[static_cast<std::uint8_t>(*(chunkStart + i))];
-
-            if (number != -1)
-            {
-
-              chunkSize *= 16;
-              chunkSize += number;
-
-              i++;
-
-              continue;
-
-            }
-
-            if (i == 0) return { REQUEST_HTTP_ERROR, m_firstRequest() };
-
-            if (*(chunkStart + i) != '\r' || *(chunkStart + i + 1) != '\n') return { REQUEST_HTTP_ERROR, m_firstRequest() };
-            if (chunkSize > 0x10000) return { REQUEST_HTTP_BUFFER_ERROR, m_firstRequest() };
-
-            break;
-
+          case 0:
+            return { REQUEST_CHUNK_COMPLETE, f };
+          case 1:
+            goto LOOP;
+          default: return { REQUEST_CHUNK_ERROR, f };
           }
-
-          m_chunk.append(chunkStart + i + 2, chunkSize);
-
-          ParserResponse response { REQUEST_CHUNK_COMPLETE, m_firstRequest() };
-          m_state = REQUEST_READING_CHUNK_SIZE;
-
-          return response; 
 
         }
 
@@ -194,35 +171,32 @@ LOOP:
     }
     goto LOOP;
   }
-  case REQUEST_READING_CHUNK_SIZE:
-  {
-    // wtf put this in http::parser, this is bullshit
-    /// 10000\r\n <- we need to get this and this is 7 chars
-    
-    ssize_t bytes = recv(m_socket, m_chunk.data() + m_chunk.size(), 7 - m_chunk.size(), 0);
-
-    break;
-  }
   case REQUEST_READING_CHUNK:
-  {
     //we need to handle this shit
 
     char buf[512];
     ssize_t bytes = recv(m_socket, buf, 512, 0);
 
-    if (bytes == -1) return { REQUEST_INCOMPLETE, m_firstRequest() };
+    if (bytes == 0) return { REQUEST_CLOSE, m_firstRequest() };
+    if (bytes == -1) return { REQUEST_INCOMPLETE, m_firstRequest() }; // handle errs
+    
+    switch (m_parser.parseChunk(buf, bytes))
 
-    ParserResponse response = { REQUEST_CHUNK_END, m_firstRequest() };
-    m_state = REQUEST_WAITING_FOR_DATA;
+    {
+      case 0:
+        return { m_parser.chunkSize == 0 ? REQUEST_CHUNK_END : REQUEST_CHUNK_COMPLETE, m_firstRequest() };
+      case 1:
+        goto LOOP;
+      default: return { REQUEST_CHUNK_ERROR, m_firstRequest() };
+    }
+
+    //ParserResponse response = { REQUEST_CHUNK_END, m_firstRequest() };
+    //m_state = REQUEST_WAITING_FOR_DATA;
  
-    std::cout << "f idk what todo: " << bytes << "\n";
+    //std::cout << "f idk what todo: " << bytes << "\n";
 
-    return response;
+    //return response;
   }
-  case REQUEST_READING_CHUNK_EOF:
-    break;
-  }
-  
 
   std::cout << "how are we here?\n";
   return { REQUEST_CLOSE, m_firstRequest() };
