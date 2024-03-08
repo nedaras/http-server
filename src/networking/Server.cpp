@@ -5,7 +5,6 @@
 #include <iostream>
 #include <cerrno>
 #include <cstring>
-#include <string_view>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -108,7 +107,7 @@ int Server::listen(const char* port)
     while (!m_timeouts.empty())
     {
 
-      Request* request = m_timeouts.top();
+      const Request* request = m_timeouts.top();
       std::chrono::milliseconds now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
 
       if (now >= request->m_timeout)
@@ -144,7 +143,7 @@ int Server::listen(const char* port)
       while (!m_timeouts.empty())
       {
 
-        Request* request = m_timeouts.top();
+        const Request* request = m_timeouts.top();
         std::chrono::milliseconds now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
 
         if (now >= request->m_timeout)
@@ -186,8 +185,6 @@ int Server::listen(const char* port)
         m_timeouts.erase(request);
         m_events.pop_back();
 
-        request->m_callEvent(END, "err");
-
         close(request->m_socket);
 
         delete request;
@@ -218,7 +215,7 @@ int Server::listen(const char* port)
             break;
           }
           
-          Request* request = new Request(clientSocket);
+          Request* request = new Request(clientSocket, this);
 
           if (request == nullptr)
           {
@@ -239,11 +236,8 @@ int Server::listen(const char* port)
             break;
           }
 
-
           m_events.push_back({});
-
           request->m_updateTimeout(60000); // we will wait one min for user to complete a request
-          m_timeouts.push(request);
 
         }
 
@@ -253,97 +247,9 @@ int Server::listen(const char* port)
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
 
-      // TODO: when calling end event we need to check if con is set to close if it is pop the request
-      while (true)
-      {
+      recv(request->m_socket, request->m_buffer->data(), request->m_buffer->size(), 0);
 
-        auto [ status, newRequest ] = request->m_parse(); // lets make this http 1.1, it means that we handle chunks and other http requests
-
-        switch (status)
-        {
-        case REQUEST_HTTP_COMPLETE:
-
-          m_timeouts.erase(request);
-          m_callback(request, Response(request, this));
-
-          request->m_callEvent(END, "end_r"); // NOTE: we can only cal end we aint like accepting chunks or sum
-
-          goto CONTINUE;
-        case REQUEST_CHUNK_COMPLETE:
-
-          if (newRequest) // if chunk complete and new req it means we skipped the REQUEST_HTTP_COMPLETE
-          {
-
-            m_timeouts.erase(request);
-            m_callback(request, Response(request, this));
-
-          }
-
-          if (request->m_parser.chunkSize > 0) // this can be set to zero if inited  request just closes the request
-          {
-
-            char* start = request->m_chunk.data() + request->m_parser.chunkSizeChars + 2;
-            std::size_t size = request->m_chunk.size() - 2 - request->m_parser.chunkSizeChars - 2;
-
-            request->m_callEvent(DATA, std::string_view(start, size));
-
-            m_timeouts.erase(request);
-            request->m_updateTimeout(60000);
-            m_timeouts.push(request);
-
-            goto CONTINUE;
-
-          }
-
-          request->m_callEvent(END, "end_no_wait");
-
-          goto CONTINUE;
-        case REQUEST_CHUNK_END:
-
-          request->m_callEvent(END, "chunk_end");
-
-          goto CONTINUE;
-        case REQUEST_INCOMPLETE:
-          if (newRequest)
-          {
-            m_timeouts.erase(request);
-            request->m_updateTimeout(60000);
-            m_timeouts.push(request);
-          }
-          break;
-        case REQUEST_CLOSE:
-        case REQUEST_HTTP_ERROR:
-        case REQUEST_HTTP_BUFFER_ERROR:
-        case REQUEST_ERROR:
-        case REQUEST_CHUNK_ERROR:
-
-          if (status != REQUEST_CLOSE) std::cout << "ERR " << status << "\n";
-
-          if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
-
-          request->m_callEvent(END, "end_e");
-
-          m_timeouts.erase(request);
-          m_events.pop_back();
-
-          close(request->m_socket);
-
-          delete request;
-
-          break;
-        }
-        
-        break;
-
-CONTINUE:
-
-        // enable c++ 23
-
-        //std::cout << "c\n";
-
-        void();
-
-      }
+      m_callback(request);
 
     }
 

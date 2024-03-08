@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Request.h"
-#include "Response.h"
 #include "../minheap/MinHeap.h"
 #include <chrono>
 #include <functional>
@@ -14,20 +13,20 @@ class Server
 
 public:
 
-  Server(const std::function<void(const Request* request, const Response& response)>& callback) : m_callback(callback) {}
+  Server(const std::function<void(const Request* request)>& callback) : m_callback(std::move(callback)) {}
 
   int listen(const char* port);
 
 private:
 
-  friend class Response;
+  friend class Request;
 
-  const std::function<void(const Request* request, const Response& response)> m_callback;
+  const std::function<void(const Request* request)> m_callback;
 
   struct CompareRequests
   {
 
-    bool operator()(Request* left, Request* right)
+    bool operator()(const Request* left, const Request* right)
     {
       return left->m_timeout > right->m_timeout;
     }
@@ -35,7 +34,7 @@ private:
   };
 
   std::vector<epoll_event> m_events;
-  MinHeap<Request*, CompareRequests> m_timeouts;
+  MinHeap<const Request*, CompareRequests> m_timeouts;
 
   int m_listenSocket;
   int m_epoll;

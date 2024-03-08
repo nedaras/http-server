@@ -28,11 +28,10 @@ void Handler(const Request* request)
 
   //});
 
-  request->setStatus(404);
+  request->setHead("Connection", "keep-alive");
   request->setHead("Content-Type", "text/html");
-  
-  request->writeBody("<h1>Server Component!</h1>");
-  request->end();
+
+  request->writeBody("<h1>Server Component!</h1>", strlen("<h1>Server Component!</h1>"));
 
 }
 
