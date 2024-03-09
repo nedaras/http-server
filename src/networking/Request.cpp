@@ -1,10 +1,12 @@
 #include "Request.h"
 
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <sys/socket.h>
 
 #include "Server.h"
+#include "../siphash/siphash.h"
 
 // TODO: make a function that would like get from 200 - OK or like 500 - Server Error messages
 void Request::setStatus(std::uint16_t status) const
@@ -24,6 +26,8 @@ void Request::setHead(std::string_view key, std::string_view value) const
 {
 
   setStatus(200);
+
+  std::cout << m_hashString(key) << "\n";
 
   send(m_socket, key.data(), key.size(), 0);
   send(m_socket, ": ", 2, 0);
@@ -80,5 +84,32 @@ void Request::m_updateTimeout(std::chrono::milliseconds::rep milliseconds) const
   m_server->m_timeouts.erase(this);
   m_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) + std::chrono::milliseconds(milliseconds);
   m_server->m_timeouts.push(this);
+
+}
+
+std::uint64_t Request::m_hashString(std::string_view string) const
+{
+  std::uintptr_t key = reinterpret_cast<std::uintptr_t>(m_server->m_callback.target<void>());
+  return siphash::siphash_xy(string.data(), string.size(), 1, 3, reinterpret_cast<std::uintptr_t>(m_server), key);
+}
+
+int Request::m_recv()
+{
+
+  ssize_t bytes = recv(m_socket, m_buffer->data() + m_bufferOffset, m_buffer->size() - m_bufferOffset, 0);
+
+  if (bytes == 0)
+  {
+
+  }
+
+  if (bytes == -1)
+  {
+    return -1;
+  }
+
+  m_bufferOffset += bytes;
+
+  return 0;
 
 }

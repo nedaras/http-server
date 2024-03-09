@@ -1,4 +1,6 @@
 #include "networking/Server.h"
+#include "siphash/siphash.h"
+#include <cstdint>
 #include <cstring>
 
 // TODO: add like default not found behavior
@@ -30,7 +32,7 @@ void Handler(const Request* request)
 
   request->setStatus(404);
   request->setHead("Content-Type", "text/html");
-  
+ 
   request->writeBody("<h1>Server Component!</h1>");
   request->end();
 

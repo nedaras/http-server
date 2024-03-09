@@ -2,6 +2,7 @@
 
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string_view>
 
@@ -32,6 +33,10 @@ private:
 
   void m_updateTimeout(std::chrono::milliseconds::rep milliseconds) const;
 
+  int m_recv();
+
+  std::uint64_t m_hashString(std::string_view string) const;
+
 private:
 
   struct Response
@@ -44,7 +49,9 @@ private:
   int m_socket;
   Server* m_server;
 
+  std::size_t m_bufferOffset = 0;
   std::unique_ptr<std::array<char, 8 * 1024>> m_buffer = std::make_unique<std::array<char, 8 * 1024>>();
+
   mutable std::chrono::milliseconds m_timeout;
 
   mutable Response m_response;

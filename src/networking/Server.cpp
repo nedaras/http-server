@@ -11,7 +11,8 @@
 #include <sys/epoll.h>
 #include <fcntl.h>
 
-#define PRINT_ERROR(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // trowed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
+#define PRINT_ERRNO(f, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // trowed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
+#define PRINT_ERROR(f, e, l) std::cout << __FILE__  ":" << __LINE__ - l << "\n\t" f "(); // trowed " << errno << "\n\nError: " << std::strerror(errno) << "\n";
 
 static int setNonBlocking(int socket)
 {
@@ -34,7 +35,7 @@ int Server::listen(const char* port)
 
   if (getaddrinfo(nullptr, port, &params, &result))
   {
-    PRINT_ERROR("getaddrinfo", 2); // make mby PRINT_ERRNO and PRINT_ERROR, some function will wail without setting errno
+    PRINT_ERROR("getaddrinfo", "invalid port", 2);
     return 1;
   }
 
@@ -42,14 +43,14 @@ int Server::listen(const char* port)
 
   if (m_listenSocket == -1)
   {
-    PRINT_ERROR("socket", 4);
+    PRINT_ERRNO("socket", 4);
     freeaddrinfo(result);
     return 1;
   }
 
   if (setNonBlocking(m_listenSocket) == -1)
   {
-    PRINT_ERROR("setNonBlocking", 2);
+    PRINT_ERRNO("setNonBlocking", 2);
     freeaddrinfo(result);
     close(m_listenSocket);
     return 1;
@@ -57,7 +58,7 @@ int Server::listen(const char* port)
 
   if (bind(m_listenSocket, result->ai_addr, result->ai_addrlen) == -1)
   {
-    PRINT_ERROR("bind", 2);
+    PRINT_ERRNO("bind", 2);
     freeaddrinfo(result);
     close(m_listenSocket);
     return 1;
@@ -67,7 +68,7 @@ int Server::listen(const char* port)
 
   if (::listen(m_listenSocket, SOMAXCONN) == -1)
   {
-    PRINT_ERROR("listen", 2);
+    PRINT_ERRNO("listen", 2);
     close(m_listenSocket);
     return 1;
   }
@@ -76,7 +77,7 @@ int Server::listen(const char* port)
 
   if (m_epoll == -1)
   {
-    PRINT_ERROR("epoll_create1", 4);
+    PRINT_ERRNO("epoll_create1", 4);
     close(m_listenSocket);
     return 1;
   }
@@ -90,7 +91,7 @@ int Server::listen(const char* port)
 
     if (epoll_ctl(m_epoll, EPOLL_CTL_ADD, m_listenSocket, &event) == -1)
     {
-      PRINT_ERROR("epoll_ctl", 2);
+      PRINT_ERRNO("epoll_ctl", 2);
       close(m_listenSocket);
       return 1;
     }
@@ -113,7 +114,7 @@ int Server::listen(const char* port)
       if (now >= request->m_timeout)
       {
 
-        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
+        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERRNO("epoll_ctl", 0);
 
         m_timeouts.pop();
         m_events.pop_back();
@@ -149,7 +150,7 @@ int Server::listen(const char* port)
         if (now >= request->m_timeout)
         {
 
-          if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
+          if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERRNO("epoll_ctl", 0);
 
           m_timeouts.pop();
           m_events.pop_back();
@@ -180,7 +181,7 @@ int Server::listen(const char* port)
 
         Request* request = static_cast<Request*>(m_events[i].data.ptr);
 
-        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
+        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERRNO("epoll_ctl", 0);
 
         m_timeouts.erase(request);
         m_events.pop_back();
@@ -204,13 +205,13 @@ int Server::listen(const char* port)
 
           if (clientSocket == -1)
           {
-            if (errno != EWOULDBLOCK) PRINT_ERROR("accept", 4);
+            if (errno != EWOULDBLOCK) PRINT_ERRNO("accept", 4);
             break;
           }
 
           if (setNonBlocking(clientSocket) == -1)
           {
-            PRINT_ERROR("setNonBlocking", 2);
+            PRINT_ERRNO("setNonBlocking", 2);
             close(clientSocket);
             break;
           }
@@ -231,7 +232,7 @@ int Server::listen(const char* port)
 
           if (epoll_ctl(m_epoll, EPOLL_CTL_ADD, clientSocket, &event) == -1)
           {
-            PRINT_ERROR("epoll_ctl", 2);
+            PRINT_ERRNO("epoll_ctl", 2);
             close(clientSocket);
             break;
           }
@@ -247,7 +248,13 @@ int Server::listen(const char* port)
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
 
-      recv(request->m_socket, request->m_buffer->data(), request->m_buffer->size(), 0);
+      while (request->m_recv())
+      {
+
+        
+
+      }
+
 
       m_callback(request);
 
@@ -255,7 +262,7 @@ int Server::listen(const char* port)
 
   }
 
-  if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, m_listenSocket, nullptr) == -1) PRINT_ERROR("epoll_ctl", 0);
+  if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, m_listenSocket, nullptr) == -1) PRINT_ERRNO("epoll_ctl", 0);
 
   close(m_listenSocket);
   close(m_epoll); 
