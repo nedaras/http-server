@@ -12,6 +12,32 @@
 #include "Server.h"
 #include "../siphash/siphash.h"
 
+// TODO: first we need to check if Chunked encoding is sent if not throw send empty optional
+void Request::readData(const DataCallback& callback) const
+{
+
+  if (m_receivingData())
+  {
+
+    std::cout << "bro readData call is allready set ok\n";
+
+    return;
+  }
+
+  char* chunk = m_buffer->data() + m_httpSize;
+  std::size_t chunkSize = m_bufferOffset - m_httpSize;
+
+  // we have to parse chunks and stuff
+
+  if (chunkSize > 0) 
+  {
+    callback(std::string_view(chunk, chunkSize));
+  }
+
+  m_dataCallback = std::move(callback);
+
+}
+
 // TODO: make a function that would like get from 200 - OK or like 500 - Server Error messages
 // TODO: make it throw error if status is already set
 void Request::setStatus(std::uint16_t status) const
@@ -149,10 +175,41 @@ bool Request::m_headerSent(std::uint64_t headerHash) const
 
 }
 
+bool Request::m_receivingData() const
+{
+  return m_dataCallback.has_value();
+}
+
+// return like a bool if connection needs to be closed
 int Request::m_recv()
 {
 
   // {HTTP}9\r\n123456789\r\n5\r\n12345\r\n0\r\n\r\n
+
+  if (m_receivingData())
+  {
+
+    char buf[512];
+
+    ssize_t bytes = recv(m_socket, buf, sizeof(buf), 0);
+    
+    if (bytes == 0)
+    {
+      std::cout << "CLOSE\n";
+      return -1;
+    }
+
+    if (bytes == -1)
+    {
+      std::cout << "ERR\n";
+      return -1;
+    }
+
+    (*m_dataCallback)(std::string_view(buf, bytes)); 
+
+    return 2;
+
+  }
 
   if (m_bufferOffset >= m_buffer->size())
   {
@@ -163,11 +220,13 @@ int Request::m_recv()
 
   if (bytes == 0)
   {
-
+    std::cout << "CLOSE\n";
+    return -1;
   }
 
   if (bytes == -1)
   {
+    std::cout << "ERR\n";
     return -1;
   }
 
@@ -178,9 +237,7 @@ int Request::m_recv()
 
   }
 
-  m_bufferOffset += bytes;
-
-  m_httpParser.parse_http(bytes, method, path, [this](std::string_view key, std::string_view value) {
+  auto [ a, b ] = m_httpParser.parse_http(bytes, method, path, [this](std::string_view key, std::string_view value) {
     
     headers.push_back(std::make_tuple(key, value));
 
@@ -188,7 +245,15 @@ int Request::m_recv()
 
   });
 
-  return 0;
+  m_bufferOffset += bytes;
+  m_httpSize += b;  
+
+  std::cout << "recv: " << bytes << "\n";
+  std::cout << "read: " << b << "\n";
+
+  std::cout << "res: " << a << "\n";
+
+  return a == http_parser::PARSER_RESPONSE_COMPLETE ? 0 : a == http_parser::PARSER_RESPONSE_PARSING ? 1 : -1;
 
 }
 
@@ -197,10 +262,12 @@ void Request::m_reset()
 
   m_response = Response();
   m_response.completed = true;
+  m_dataCallback.reset();
 
   headers.clear();
 
   m_httpParser.clear(m_buffer->data());
   m_bufferOffset = 0;
+  m_httpSize = 0;
 
 }

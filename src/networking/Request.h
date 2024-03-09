@@ -3,18 +3,25 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
 
 #include "../http/parser.h"
 
+// TODO: bro dont do request as a const, not cool
+
 class Server;
 class Request
 {
 
 public:
+
+  using DataCallback = std::function<bool(std::optional<std::string_view>)>;
+  void readData(const DataCallback& callback) const;
 
   void setStatus(std::uint16_t status) const;
 
@@ -49,6 +56,8 @@ private:
 
   bool m_headerSent(std::uint64_t headerHash) const;
 
+  bool m_receivingData() const;
+
 public:
 
   std::string_view method;
@@ -71,11 +80,13 @@ private:
   Server* m_server;
 
   std::size_t m_bufferOffset = 0;
+  std::size_t m_httpSize = 0;
   std::unique_ptr<std::array<char, 8 * 1024>> m_buffer = std::make_unique<std::array<char, 8 * 1024>>();
 
   http_parser::Parser m_httpParser;
 
   mutable std::chrono::milliseconds m_timeout;
   mutable Response m_response {};
+  mutable std::optional<DataCallback> m_dataCallback;
 
 };

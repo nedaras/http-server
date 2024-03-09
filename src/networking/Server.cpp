@@ -255,7 +255,7 @@ int Server::listen(const char* port)
       //    if not we need to throw if data is invalid or throw if they're sending data (mb this is dumb con will be closed if we not read data)
      
       // #5 how the fuck should request::parseBody even work? if lets sey they dont sent whole body in one packet
-      //    mb make a macro that would early return
+      //    mb make a macro that would early return, mb to same shit as below
       
       // #6 fuck #5 first we need to habdle chunked encoding baby
       //    mb add request::parseData([request](optional<data>) -> return true)
@@ -263,15 +263,31 @@ int Server::listen(const char* port)
       //      - return value just says if data sent was correct, if we return false connection will be terminated
       //      - if data size will be 0 it means we have recv the last chunk or everything is done
       //      - note only in call back we can call the request::end so we need to be robust and all
-
-      request->m_recv();
-
+      //      - cool thing is if we call this function we cann parse our left buffer and then call it in the callback
+      int r = request->m_recv();
+      if (r == 0)
+      {
       // handle http parsed thing
       // handle new received data
       // handle closes
       // handle errors
+        m_callback(request);
 
-      m_callback(request);
+      }
+      else if (r == -1)
+      {
+
+
+        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERRNO("epoll_ctl", 0);
+
+        m_timeouts.erase(request);
+        m_events.pop_back();
+
+        close(request->m_socket);
+
+        delete request;
+
+      }
 
     }
 

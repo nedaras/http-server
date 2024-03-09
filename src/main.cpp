@@ -27,11 +27,30 @@ void Handler(const Request* request)
 
   //});
 
-  request->setHead("Content-Type", "text/html");
+  request->readData([request](auto data) {
+
+    std::string_view body = data.value_or("no data");
+
+    std::cout << body << "\n";
+
+    request->setHead("Content-Type", "text/html");
+
+    if (data == "0\r\n\r\n") 
+    {
+
+      request->writeBody("<h1>Server Component!</h1>");
+
+      request->end();
+
+    }
+
+    return true;
+
+  });
+
   //request->setHead("Content-Type", "application/json");
 
-  request->writeBody("<h1>Server Component!</h1>");
-  request->end();
+  //request->end(); // it we comma it it will make readData recv everything, for now even http req
 
 }
 
