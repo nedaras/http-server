@@ -220,7 +220,7 @@ int Server::listen(const char* port)
 
           if (request == nullptr)
           {
-            std::cout << "nullptr request\n";
+            PRINT_ERROR("new Request", "allocation failed", 4);
             close(clientSocket);
             break;
           }
@@ -238,7 +238,7 @@ int Server::listen(const char* port)
           }
 
           m_events.push_back({});
-          request->m_updateTimeout(60000); // we will wait one min for user to complete a request
+          request->m_updateTimeout(60000);
 
         }
 
@@ -248,7 +248,16 @@ int Server::listen(const char* port)
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
 
+      // #1 we need to know if this is like a new request
+      // #2 we need to parse **only** the http part first
+      // #3 we need to know when should a request be completed, even without calling response::end
+
       request->m_recv();
+
+      // handle http parsed thing
+      // handle new received data
+      // handle closes
+      // handle errors
 
       m_callback(request);
 

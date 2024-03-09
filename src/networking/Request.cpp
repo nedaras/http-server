@@ -82,7 +82,9 @@ void Request::end() const
 {
 
   m_updateTimeout(5000); // mb we need to delete vector and set everything to 0
+
   m_response = Response();
+  m_complete = true;
 
 }
 
@@ -163,6 +165,14 @@ int Request::m_recv()
   }
 
   m_bufferOffset += bytes;
+
+  m_httpParser.parse_http(bytes, method, path, [](std::string_view key, std::string_view value) {
+
+    std::cout << key << ": " << value << "\n";
+
+    return true;
+
+  });
 
   return 0;
 

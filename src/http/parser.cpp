@@ -1,8 +1,7 @@
 #include "parser.h"
-#include <algorithm>
 #include <cstdint>
-#include <iostream>
 #include <string_view>
+#include <tuple>
 
 // TODO: make return values an error return values
 // TODO: make some standards like what chars can be used idk utf-8 if im not bored
@@ -83,73 +82,19 @@ static constexpr std::int8_t unhex[256] = {
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
 };
 
-static std::int32_t toNumber(std::string_view buffer)
-{
-
-  static constexpr std::size_t bufferSize = 5;
-
-  if (buffer.size() > bufferSize) return -1;
-
-  std::int32_t result = 0;
-  std::uint16_t position = 1;
-
-  std::uint8_t i = 1;
-
-  while (std::min(buffer.size(), bufferSize) >= i)
-  {
-
-    char c = buffer[buffer.size() - i];
-
-    if (!IS_NUMBER(c)) return -1;
-
-    result += (c - '0') * position;
-    position *= 10;
-
-    i++;
-
-  }
-
-  return result;
-
-}
-
-// TODO: make int like throwable
-int http::Parser::m_newHeader(Header& header)// ret errors back
-{
-
-  if (header.key == "Content-Length")
-  {
-
-    std::int32_t length = toNumber(header.value);
-
-    if (length == -1 || length > 0x10000) return -1; // return -1, or state idk
-
-    bodyLength = length;
-
-  }
-
-  if (header.key == "Transfer-Encoding") // well it only works with chunked
-  {
-
-    chunked = true;
-
-  }
-
-  headers.push_back(m_header);
-
-  return 0;
-
-}
-
 // if would want to add like some special state of headers, when using POST requests we will have to refactor this code
 // to make it more simple to obtain
 
+#define TUPLE(i) std::make_tuple(i, bytesRead);
+
 // it only parsed the headers which is cool but u know
-int http::Parser::parse(std::size_t bytes) // mb build unit tests
+std::tuple<http_parser::PARSER_RESPONSE, std::size_t> 
+http_parser::Parser::parse_http(std::size_t bytes, std::string_view& method, std::string_view& path, const HeaderCallback& callback)
 {
 
   char* end = &m_buffer[bytes];
- 
+  std::size_t bytesRead = 0;
+
   while (m_buffer != end)
   {
 
@@ -160,64 +105,64 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
     case REQUEST_METHOD:
       if (*m_buffer != ' ') 
       {
-        if (!IS_UPPER_ALPHA(*m_buffer)) return -1; // mb validate if request string is exsisting
+        if (!IS_UPPER_ALPHA(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR);
         break;
       }
       method = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
       m_state = REQUEST_PATH_BEGIN;
       break;
     case REQUEST_PATH_BEGIN:
-      if (*m_buffer != '/') return -1;
+      if (*m_buffer != '/') return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_PATH;
       m_unhandledBuffer = m_buffer;
       break;
     case REQUEST_PATH:
       if (*m_buffer != ' ')
       {
-        if (!IS_URL_CHAR(*m_buffer)) return -1;// mb just mb parse url too
+        if (!IS_URL_CHAR(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR);// mb just mb parse url too
         break;
       }
       path = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
       m_state = REQUEST_H;
       break;
     case REQUEST_H:
-      if (*m_buffer != 'H') return -1;
+      if (*m_buffer != 'H') return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_HT;
       break;
     case REQUEST_HT: 
-      if (*m_buffer != 'T') return -1;
+      if (*m_buffer != 'T') return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_HTT;
       break;
     case REQUEST_HTT: 
-      if (*m_buffer != 'T') return -1;
+      if (*m_buffer != 'T') return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_HTTP;
       break;
     case REQUEST_HTTP:
-      if (*m_buffer != 'P') return -1;
+      if (*m_buffer != 'P') return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_HTTP_DASH; 
       break;
     case REQUEST_HTTP_DASH:
-      if (*m_buffer != '/') return -1;
+      if (*m_buffer != '/') return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_HTTP_MINOR; 
       break;
     case REQUEST_HTTP_MINOR:
-      if (*m_buffer != '1') return -1; // we need other versions aa:w
+      if (*m_buffer != '1') return TUPLE(PARSER_RESPONSE_ERROR); // we need other versions aa:w
       m_state = REQUEST_HTTP_DOT; 
       break;
     case REQUEST_HTTP_DOT:
-      if (*m_buffer != '.') return -1;
+      if (*m_buffer != '.') return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_HTTP_MAJOR; 
       break;
     case REQUEST_HTTP_MAJOR:
-      if (*m_buffer != '1') return -1; // we will only accept 1.1 for now
+      if (*m_buffer != '1') return TUPLE(PARSER_RESPONSE_ERROR); // we will only accept 1.1 for now
       m_state = REQUEST_HTTP_ALMOST_END; 
       break;
     case REQUEST_HTTP_ALMOST_END:
-      if (*m_buffer != '\r') return -1;
+      if (*m_buffer != '\r') return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_HTTP_END;
       break;
     case REQUEST_HTTP_END:
-      if (*m_buffer != '\n') return -1;
+      if (*m_buffer != '\n') return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_HEADER_KEY_BEGIN;
       break;
     case REQUEST_HEADER_KEY_BEGIN:
@@ -228,129 +173,61 @@ int http::Parser::parse(std::size_t bytes) // mb build unit tests
       }
 
       // make diffrent struct that accepts A-Z;a-z;0-9;-;_;
-      if (!IS_TOKEN(*m_buffer)) return -1;
+      if (!IS_TOKEN(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_HEADER_KEY;
       m_unhandledBuffer = m_buffer;
       break;
     case REQUEST_HEADER_KEY:
       if (*m_buffer != ':') 
       {
-        if (!IS_TOKEN(*m_buffer)) return -1; // is token kinda idk idk sucks
+        if (!IS_TOKEN(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR); // is token kinda idk idk sucks
         break; 
       }
-      m_header.key = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
+      m_headerKey = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
       m_state = REQUEST_HEADER_KEY_END;
       break;
     case REQUEST_HEADER_KEY_END:
-      if (*m_buffer != ' ') return -1;
+      if (*m_buffer != ' ') return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_HEADER_VALUE_BEGIN;
       break;
     case REQUEST_HEADER_VALUE_BEGIN:
-      if (!IS_HEADER_CHAR(*m_buffer)) return -1;
+      if (!IS_HEADER_CHAR(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_HEADER_VALUE;
       m_unhandledBuffer = m_buffer;
       break;
     case REQUEST_HEADER_VALUE:
       if (*m_buffer == '\r')
       {
-        m_header.value = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
-        if (m_newHeader(m_header) == -1) return -1;
+        std::string_view headerValue(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
+        if (!callback(m_headerKey, headerValue)) return TUPLE(PARSER_RESPONSE_ERROR);
         m_state = REQUEST_HEADER_END;
-
         break;
       }
-      
-      if (!IS_HEADER_CHAR(*m_buffer)) return -1;
+      if (!IS_HEADER_CHAR(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR);
       break;
     case REQUEST_HEADER_END:
-      if (*m_buffer != '\n') return -1;
+      if (*m_buffer != '\n') return TUPLE(PARSER_RESPONSE_ERROR);
       m_state = REQUEST_HEADER_KEY_BEGIN;
       break;
     case REQUEST_EOF:
-      return *m_buffer == '\n' ? 0 : -1;
+      return TUPLE(*m_buffer == '\n' ? PARSER_RESPONSE_COMPLETE : PARSER_RESPONSE_ERROR);
     }
   
     m_buffer++;
 
   }
 
-  return 1;
+  return TUPLE(PARSER_RESPONSE_PARSING);
 
 }
 
 
-int http::Parser::parseChunk(char* buffer, std::size_t bytes) // we need this chunk buffer to be global
+void http_parser::Parser::clear(char* buffer)
 {
-  
-  char* end = &buffer[bytes];
-  std::size_t unhandledBytes = bytes;
 
-  while (buffer != end)
-  {
+  m_buffer = buffer;
+  m_unhandledBuffer = buffer;
 
-    char c = *buffer;
-
-    switch (m_chunkState)
-    {
-    case REQUEST_CHUNK_SIZE:
-      if (c == '\r')
-      {
-        chunkSize = m_chunkSize;
-        chunkSizeChars = m_chunkSizeChars;  
-
-        m_chunkState = REQUEST_CHUNK_BEGIN;
-        break;
-      }
-
-      if (unhex[static_cast<std::uint8_t>(c)] == -1) return -1;
-
-      m_chunkSize *= 16;
-      m_chunkSize += unhex[static_cast<std::uint8_t>(c)];
-
-      if (m_chunkSize > 0x10000) return -1;
-
-      m_chunkSizeChars++;
-
-      break;
-    case REQUEST_CHUNK_BEGIN:
-      if (c != '\n') return -1;
-      unhandledBytes = end - buffer - 1; // -1 couse we handle current byte
-      m_chunkState = REQUEST_CHUNK_BODY;
-      break;
-    case REQUEST_CHUNK_BODY:
-      m_chunkSizeReceived += unhandledBytes;
-
-      if (m_chunkSizeReceived >= m_chunkSize)
-      {
-
-
-        m_chunkState = REQUEST_CHUNK_END_CR;
-        if (chunkSize == 0) buffer--;
-        else buffer += m_chunkSize - 1;
-        
-        break;
-
-      }
-
-      buffer += unhandledBytes - 1;
-      break;
-    case REQUEST_CHUNK_END_CR:
-      if (c != '\r') return -1;
-      m_chunkState = REQUEST_CHUNK_END_LF;
-      break;
-    case REQUEST_CHUNK_END_LF:
-      if (c != '\n') return -1;
-      m_chunkState = REQUEST_CHUNK_SIZE;
-      m_chunkSize = 0;
-      m_chunkSizeChars = 0;
-      m_chunkSizeReceived = 0;
-      return 0; // return total bytes read, couse u know it can be another chunk after this one
-    }
-
-    buffer++;
-
-  }
-
-  return 1;
+  m_state = REQUEST_METHOD;
 
 }

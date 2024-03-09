@@ -7,6 +7,8 @@
 #include <string_view>
 #include <vector>
 
+#include "../http/parser.h"
+
 class Server;
 class Request
 {
@@ -24,7 +26,7 @@ public:
 
 private:
 
-  Request(int socket, Server* server) : m_socket(socket), m_server(server) {};
+  Request(int socket, Server* server) : m_socket(socket), m_server(server), m_httpParser(m_buffer->data()) {};
 
   void m_setHead(std::string_view key, std::string_view value, std::uint64_t hash) const;
 
@@ -44,6 +46,11 @@ private:
 
   bool m_headerSent(std::uint64_t headerHash) const;
 
+public:
+
+  std::string_view method;
+  std::string_view path;
+
 private:
 
   struct Response
@@ -60,8 +67,10 @@ private:
   std::size_t m_bufferOffset = 0;
   std::unique_ptr<std::array<char, 8 * 1024>> m_buffer = std::make_unique<std::array<char, 8 * 1024>>();
 
-  mutable std::chrono::milliseconds m_timeout;
+  http_parser::Parser m_httpParser;
 
-  mutable Response m_response;
+  mutable std::chrono::milliseconds m_timeout;
+  mutable Response m_response {};
+  mutable bool m_complete = false;
 
 };
