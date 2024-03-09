@@ -1,14 +1,19 @@
 #include "Request.h"
 
+#include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <ctime>
+#include <iomanip>
 #include <string>
+#include <string_view>
 #include <sys/socket.h>
 
 #include "Server.h"
 #include "../siphash/siphash.h"
 
 // TODO: make a function that would like get from 200 - OK or like 500 - Server Error messages
+// TODO: make it throw error if status is already set
 void Request::setStatus(std::uint16_t status) const
 {
 
@@ -79,10 +84,21 @@ void Request::end() const
 
 void Request::m_setDate() const
 {
-  setHead("Date", "pizda_naxui");
+
+  static std::uint64_t hash = m_hashString("Date");
+  if (m_headerSent(hash)) return; 
+
+  // for null termination
+  char date[29 + 1];
+
+  std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); 
+  std::strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S GMT", std::gmtime(&now));
+
+  m_setHead("Date", date, hash);
+
 }
 
-void Request::m_setContentLength(std::size_t length) const// mb wrap in define this is kinda repatitive
+void Request::m_setContentLength(std::size_t length) const
 {
   static std::uint64_t hash = m_hashString("Content-Length");
   if (!m_headerSent(hash)) m_setHead("Content-Length", std::to_string(length), hash);
@@ -93,7 +109,7 @@ void Request::m_setKeepAlive() const
   setHead("Connection", "keep-alive");
 }
 // THREAD_LOCK
-void Request::m_updateTimeout(std::chrono::milliseconds::rep milliseconds) const
+void Request::m_updateTimeout(std::time_t milliseconds) const
 {
 
   m_server->m_timeouts.erase(this);

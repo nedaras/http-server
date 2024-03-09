@@ -1,5 +1,4 @@
 #include "Server.h"
-  request->setHead("Content-Length", "10");
 
 #include "./Request.h"
 #include <chrono>

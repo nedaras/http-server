@@ -34,7 +34,7 @@ private:
 
   void m_setKeepAlive() const;
 
-  void m_updateTimeout(std::chrono::milliseconds::rep milliseconds) const;
+  void m_updateTimeout(std::time_t milliseconds) const;
 
   int m_recv();
 
