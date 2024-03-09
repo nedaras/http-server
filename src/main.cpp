@@ -32,6 +32,8 @@ void Handler(const Request* request)
 
   request->setStatus(404);
   request->setHead("Content-Type", "text/html");
+  request->setHead("Content-Length", "10");
+  request->setHead("Content-Length", "69");
  
   request->writeBody("<h1>Server Component!</h1>");
   request->end();

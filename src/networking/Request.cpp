@@ -24,15 +24,30 @@ void Request::setStatus(std::uint16_t status) const
 
 void Request::setHead(std::string_view key, std::string_view value) const
 {
+  m_setHead(key, value, m_hashString(key));
+}
+
+void Request::m_setHead(std::string_view key, std::string_view value, std::uint64_t hash) const
+{
 
   setStatus(200);
 
-  std::cout << m_hashString(key) << "\n";
+  if (m_headerSent(hash)) [[unlikely]]
+  {
+
+    std::cout << "why the fuck u sending same headers\n";
+
+    return;
+
+  }
 
   send(m_socket, key.data(), key.size(), 0);
   send(m_socket, ": ", 2, 0);
   send(m_socket, value.data(), value.size(), 0);
   send(m_socket, "\r\n", 2, 0);
+
+  // THREAD_LOCK
+  m_response.sentHeaders.push_back(hash);
 
 }
 
@@ -67,10 +82,10 @@ void Request::m_setDate() const
   setHead("Date", "pizda_naxui");
 }
 
-// intresting idea to store hashes of headers we have sent
-void Request::m_setContentLength(std::size_t length) const
+void Request::m_setContentLength(std::size_t length) const// mb wrap in define this is kinda repatitive
 {
-  setHead("Content-Length", std::to_string(length));
+  static std::uint64_t hash = m_hashString("Content-Length");
+  if (!m_headerSent(hash)) m_setHead("Content-Length", std::to_string(length), hash);
 }
 
 void Request::m_setKeepAlive() const
@@ -91,6 +106,16 @@ std::uint64_t Request::m_hashString(std::string_view string) const
 {
   std::uintptr_t key = reinterpret_cast<std::uintptr_t>(m_server->m_callback.target<void>());
   return siphash::siphash_xy(string.data(), string.size(), 1, 3, reinterpret_cast<std::uintptr_t>(m_server), key);
+}
+
+// THREAD_LOCK
+bool Request::m_headerSent(std::uint64_t headerHash) const
+{
+
+  for (std::uint64_t hash : m_response.sentHeaders) if (headerHash == hash) return true;
+  
+  return false;
+
 }
 
 int Request::m_recv()

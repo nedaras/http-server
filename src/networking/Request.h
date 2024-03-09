@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <string_view>
+#include <vector>
 
 class Server;
 class Request
@@ -25,6 +26,8 @@ private:
 
   Request(int socket, Server* server) : m_socket(socket), m_server(server) {};
 
+  void m_setHead(std::string_view key, std::string_view value, std::uint64_t hash) const;
+
   void m_setDate() const;
 
   void m_setContentLength(std::size_t length) const;
@@ -37,11 +40,14 @@ private:
 
   std::uint64_t m_hashString(std::string_view string) const;
 
+  bool m_headerSent(std::uint64_t headerHash) const;
+
 private:
 
   struct Response
   {
     bool statusSent : 1;
+    std::vector<std::uint64_t> sentHeaders;
   };
 
   friend class Server;
