@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
+#include <tuple>
 
 #include "Server.h"
 #include "../siphash/siphash.h"
@@ -78,14 +79,13 @@ void Request::writeBody(const char* buffer, std::size_t size) const
 
 }
 
+// THREAD_LOCK
 void Request::end() const
 {
-
-  m_updateTimeout(5000); // mb we need to delete vector and set everything to 0
-
-  m_response = Response();
-  m_complete = true;
-
+  
+  m_updateTimeout(5000);
+  const_cast<Request*>(this)->m_reset(); // red fucking flag
+  
 }
 
 void Request::m_setDate() const
@@ -152,6 +152,13 @@ bool Request::m_headerSent(std::uint64_t headerHash) const
 int Request::m_recv()
 {
 
+  // {HTTP}9\r\n123456789\r\n5\r\n12345\r\n0\r\n\r\n
+
+  if (m_bufferOffset >= m_buffer->size())
+  {
+
+  }
+
   ssize_t bytes = recv(m_socket, m_buffer->data() + m_bufferOffset, m_buffer->size() - m_bufferOffset, 0);
 
   if (bytes == 0)
@@ -164,16 +171,36 @@ int Request::m_recv()
     return -1;
   }
 
+  if (m_response.completed)
+  {
+
+    m_response.completed = false;
+
+  }
+
   m_bufferOffset += bytes;
 
-  m_httpParser.parse_http(bytes, method, path, [](std::string_view key, std::string_view value) {
-
-    std::cout << key << ": " << value << "\n";
+  m_httpParser.parse_http(bytes, method, path, [this](std::string_view key, std::string_view value) {
+    
+    headers.push_back(std::make_tuple(key, value));
 
     return true;
 
   });
 
   return 0;
+
+}
+
+void Request::m_reset()
+{
+
+  m_response = Response();
+  m_response.completed = true;
+
+  headers.clear();
+
+  m_httpParser.clear(m_buffer->data());
+  m_bufferOffset = 0;
 
 }

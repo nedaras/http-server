@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "../http/parser.h"
@@ -42,6 +43,8 @@ private:
 
   int m_recv();
 
+  void m_reset();
+
   std::uint64_t m_hashString(std::string_view string) const;
 
   bool m_headerSent(std::uint64_t headerHash) const;
@@ -51,10 +54,13 @@ public:
   std::string_view method;
   std::string_view path;
 
+  std::vector<std::tuple<std::string_view, std::string_view>> headers; // set doesent like string_view idk why
+
 private:
 
   struct Response
   {
+    bool completed : 1;
     bool statusSent : 1;
     std::vector<std::uint64_t> sentHeaders;
   };
@@ -71,6 +77,5 @@ private:
 
   mutable std::chrono::milliseconds m_timeout;
   mutable Response m_response {};
-  mutable bool m_complete = false;
 
 };

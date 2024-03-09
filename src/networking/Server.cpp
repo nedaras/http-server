@@ -251,6 +251,18 @@ int Server::listen(const char* port)
       // #1 we need to know if this is like a new request
       // #2 we need to parse **only** the http part first
       // #3 we need to know when should a request be completed, even without calling response::end
+      // #4 client has to set if we want to recv body or recv chunked data, like with methods request::parseBody
+      //    if not we need to throw if data is invalid or throw if they're sending data (mb this is dumb con will be closed if we not read data)
+     
+      // #5 how the fuck should request::parseBody even work? if lets sey they dont sent whole body in one packet
+      //    mb make a macro that would early return
+      
+      // #6 fuck #5 first we need to habdle chunked encoding baby
+      //    mb add request::parseData([request](optional<data>) -> return true)
+      //      - what it does it will just add an callback where we recv for data and if optional is null it means connection was closed
+      //      - return value just says if data sent was correct, if we return false connection will be terminated
+      //      - if data size will be 0 it means we have recv the last chunk or everything is done
+      //      - note only in call back we can call the request::end so we need to be robust and all
 
       request->m_recv();
 
