@@ -1,7 +1,4 @@
 #include "networking/Server.h"
-#include "siphash/siphash.h"
-#include <cstdint>
-#include <cstring>
 
 // TODO: add like default not found behavior
 // TODO: handle conection close
@@ -31,6 +28,7 @@ void Handler(const Request* request)
   //});
 
   request->setHead("Content-Type", "text/html");
+  request->setHead("Content-Type", "application/json");
 
   request->writeBody("<h1>Server Component!</h1>");
   request->end();

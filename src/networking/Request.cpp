@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <cstring>
 #include <ctime>
-#include <iomanip>
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
@@ -29,14 +28,10 @@ void Request::setStatus(std::uint16_t status) const
 
 void Request::setHead(std::string_view key, std::string_view value) const
 {
-  m_setHead(key, value, m_hashString(key));
-}
 
-void Request::m_setHead(std::string_view key, std::string_view value, std::uint64_t hash) const
-{
+  std::uint64_t hash = m_hashString(key);
 
-  setStatus(200);
-
+  // THREAD_LOCK
   if (m_headerSent(hash)) [[unlikely]]
   {
 
@@ -45,6 +40,15 @@ void Request::m_setHead(std::string_view key, std::string_view value, std::uint6
     return;
 
   }
+
+  m_setHead(key, value, hash);
+
+}
+
+void Request::m_setHead(std::string_view key, std::string_view value, std::uint64_t hash) const
+{
+
+  setStatus(200);
 
   send(m_socket, key.data(), key.size(), 0);
   send(m_socket, ": ", 2, 0);
@@ -65,9 +69,9 @@ void Request::writeBody(const char* buffer, std::size_t size) const
 {
 
   m_setDate();
-  m_setContentLength(size);
+  m_setConnection();
   m_setKeepAlive();
-  // m_setTimeout();
+  m_setContentLength(size);
 
   send(m_socket, "\r\n", 2, 0);
   send(m_socket, buffer, size, 0);
@@ -77,8 +81,8 @@ void Request::writeBody(const char* buffer, std::size_t size) const
 void Request::end() const
 {
 
-  m_updateTimeout(5000);
-  m_response = {};
+  m_updateTimeout(5000); // mb we need to delete vector and set everything to 0
+  m_response = Response();
 
 }
 
@@ -104,10 +108,19 @@ void Request::m_setContentLength(std::size_t length) const
   if (!m_headerSent(hash)) m_setHead("Content-Length", std::to_string(length), hash);
 }
 
+void Request::m_setConnection() const
+{
+  static std::uint64_t hash = m_hashString("Connection");
+  if (!m_headerSent(hash)) m_setHead("Connection", "keep-alive", hash);
+}
+
+// TODO: only send keep alive if connection is keep alive
 void Request::m_setKeepAlive() const
 {
-  setHead("Connection", "keep-alive");
+  static std::uint64_t hash = m_hashString("Keep-Alive");
+  if (!m_headerSent(hash)) m_setHead("Keep-Alive", "timeout=5", hash);
 }
+
 // THREAD_LOCK
 void Request::m_updateTimeout(std::time_t milliseconds) const
 {

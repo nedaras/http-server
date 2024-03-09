@@ -248,13 +248,7 @@ int Server::listen(const char* port)
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
 
-      while (request->m_recv())
-      {
-
-        
-
-      }
-
+      request->m_recv();
 
       m_callback(request);
 

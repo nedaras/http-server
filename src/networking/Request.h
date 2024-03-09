@@ -32,6 +32,8 @@ private:
 
   void m_setContentLength(std::size_t length) const;
 
+  void m_setConnection() const;
+
   void m_setKeepAlive() const;
 
   void m_updateTimeout(std::time_t milliseconds) const;
