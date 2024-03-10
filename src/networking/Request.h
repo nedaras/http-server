@@ -4,8 +4,10 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
@@ -50,6 +52,8 @@ private:
 
   int m_recv();
 
+  int m_recvChunks();
+
   void m_reset();
 
   std::uint64_t m_hashString(std::string_view string) const;
@@ -57,6 +61,8 @@ private:
   bool m_headerSent(std::uint64_t headerHash) const;
 
   bool m_receivingData() const;
+
+  std::optional<std::string_view> m_getHeadersValue(std::string_view key) const;
 
 public:
 
@@ -74,6 +80,37 @@ private:
     std::vector<std::uint64_t> sentHeaders;
   };
 
+  struct ChunkPacket
+  {
+
+    void reserveAndCopy(const char* buf, std::size_t size)
+    {
+      if (size > chunkCharacters + 2 + chunkSize + 2)
+      {
+        std::cout << "we cant copy couse bro size is to small.\n";
+        return;
+      }
+
+      buffer.reserve(chunkCharacters + 2 + chunkSize + 2);
+      buffer.append(buf, size);
+    }
+
+    char* offseted()
+    {
+      return buffer.data() + bufferOffset;
+    }
+
+    std::size_t left() const
+    {
+      return buffer.capacity() - buffer.size();
+    }
+
+    std::string buffer;
+    std::size_t bufferOffset = 0;
+    std::uint32_t chunkSize = 0;
+    std::uint8_t chunkCharacters = 0;
+  };
+
   friend class Server;
 
   int m_socket;
@@ -81,10 +118,11 @@ private:
 
   std::size_t m_bufferOffset = 0;
   std::size_t m_httpSize = 0;
+
   std::unique_ptr<std::array<char, 8 * 1024>> m_buffer = std::make_unique<std::array<char, 8 * 1024>>();
+  mutable std::unique_ptr<ChunkPacket> m_chunkPacket;
 
-  http_parser::Parser m_httpParser;
-
+  mutable http_parser::Parser m_httpParser;
   mutable std::chrono::milliseconds m_timeout;
   mutable Response m_response {};
   mutable std::optional<DataCallback> m_dataCallback;

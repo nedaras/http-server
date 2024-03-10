@@ -12,32 +12,16 @@
 void Handler(const Request* request)
 {
 
-  //request->on(END, [request](auto dt)
-  //{
-
-    //std::cout << dt << "\n";
-    //request.end();
-
-  //});
-
-  //request->on(DATA, [](auto dt)
-  //{
-
-    //std::cout << dt << "\n";
-
-  //});
-
   request->readData([request](auto data) {
 
     std::string_view body = data.value_or("no data");
 
-    std::cout << body << "\n";
+    //std::cout << body;
 
-    request->setHead("Content-Type", "text/html");
-
-    if (data == "0\r\n\r\n") 
+    if (body.size() == 0) 
     {
 
+      request->setHead("Content-Type", "text/html");
       request->writeBody("<h1>Server Component!</h1>");
 
       request->end();

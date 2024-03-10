@@ -35,7 +35,7 @@ int Server::listen(const char* port)
 
   if (getaddrinfo(nullptr, port, &params, &result))
   {
-    PRINT_ERROR("getaddrinfo", "invalid port", 2);
+    PRINT_ERROR("getaddrinfo", "Invalid port", 2);
     return 1;
   }
 
@@ -103,8 +103,9 @@ int Server::listen(const char* port)
   while (true)
   {
 
-    std::chrono::milliseconds::rep timeout = -1;
+    std::time_t timeout = -1;
 
+    // move this to a function
     while (!m_timeouts.empty())
     {
 
