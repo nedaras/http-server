@@ -40,7 +40,7 @@ public:
     using HeaderCallback = std::function<bool(std::string_view key, std::string_view value)>;
     std::tuple<PARSER_RESPONSE, std::size_t> parse_http(std::size_t bytes, std::string_view& method, std::string_view& path, const HeaderCallback& callback);
 
-    std::tuple<PARSER_RESPONSE, std::size_t> parse_chunk(char* buffer, std::size_t bytes, std::uint32_t& size, std::uint8_t& characters, std::size_t offset);
+    std::tuple<PARSER_RESPONSE, std::size_t> parse_chunk(char* buffer, std::size_t bytes, std::uint32_t& size, std::uint8_t& characters, std::size_t& bytesReceived);
 
     constexpr bool chunkSizeParsed()
     {

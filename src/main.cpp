@@ -16,8 +16,6 @@ void Handler(const Request* request)
 
     std::string_view body = data.value_or("no data");
 
-    //std::cout << body;
-
     if (body.size() == 0) 
     {
 

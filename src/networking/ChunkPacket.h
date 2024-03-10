@@ -1,12 +1,9 @@
 #pragma once
 
-#include <algorithm>
-#include <cstdint>
 #include <functional>
 #include <optional>
 #include <string_view>
 #include <vector>
-
 
 using DataCallback = std::function<bool(std::optional<std::string_view>)>;
 
@@ -22,10 +19,12 @@ public:
 
   int recv();
 
+  void clear();
+
 private:
 
   std::vector<char> m_buffer;
-  std::size_t m_bufferOffset = 0;
+  std::size_t m_bytesReceived = 0;
 
   std::uint32_t m_chunkSize = 0;
   std::uint8_t m_chunkCharacters = 0;

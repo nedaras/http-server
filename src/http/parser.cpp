@@ -231,7 +231,7 @@ http_parser::Parser::parse_http(std::size_t bytes, std::string_view& method, std
 // chunk reset to reset our chunk how can an userhandle how big a chunk should be
 
 std::tuple<PARSER_RESPONSE, std::size_t> 
-http_parser::Parser::parse_chunk(char* buffer, std::size_t bytes, std::uint32_t& size, std::uint8_t& characters, std::size_t offset)
+http_parser::Parser::parse_chunk(char* buffer, std::size_t bytes, std::uint32_t& size, std::uint8_t& characters, std::size_t& bytesReceived)
 {
 
   char* end = &buffer[bytes];
@@ -264,19 +264,19 @@ http_parser::Parser::parse_chunk(char* buffer, std::size_t bytes, std::uint32_t&
       break;
     case CHUNK_BODY:
     {
-      // TODO: update bytesRead
-      // and buffer, add -1 btw
 
-      std::size_t bytesToSkip = size - offset;
-      std::size_t bytesSkipped = std::min(bytes - characters - 2, bytesToSkip);
+      bytesRead--;
+      buffer--;
 
-      std::cout << "btesToSkip: " << bytesToSkip << "\n";
-      std::cout << "skipped: " << bytesSkipped << "\n";
+      std::size_t bytesToSkip = size - bytesReceived;
+      std::size_t bytesSkipped = std::min(bytes - bytesRead, bytesToSkip);
 
-      bytesRead += bytesSkipped - 1;
-      buffer += bytesSkipped - 1;
+      bytesRead += bytesSkipped;
+      buffer += bytesSkipped;
 
-      m_chunk_state = CHUNK_END;
+      bytesReceived += bytesSkipped;
+
+      if (bytesToSkip == bytesSkipped) m_chunk_state = CHUNK_END;
 
       break;
     }

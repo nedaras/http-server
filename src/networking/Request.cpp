@@ -51,10 +51,11 @@ void Request::readData(const DataCallback& callback) const
    
     std::uint32_t size = 0;
     std::uint8_t characters = 0;
+    std::size_t bytesReceived = 0;
 
     // TODO: idk we can make Packet struct, tha would like contain buffer and a size, and like expected max size idk
     // pass max_chunk size 0x10000
-    auto [ status, bytesRead ] = m_httpParser.parse_chunk(buffer, bytes, size, characters, 0);
+    auto [ status, bytesRead ] = m_httpParser.parse_chunk(buffer, bytes, size, characters, bytesReceived);
 
     switch (status)
     {
