@@ -48,7 +48,7 @@ void Request::readData(const DataCallback& callback) const
     // ok so if we get incomplete it means that a whole chunk did not fit inside the buffer, so we will need to allocate chunk buffe
     // and copy some data
     //
-    
+   
     std::uint32_t size = 0;
     std::uint8_t characters = 0;
 
@@ -59,6 +59,7 @@ void Request::readData(const DataCallback& callback) const
     switch (status)
     {
     case PARSER_RESPONSE_COMPLETE:
+
       std::cout << "bytes: " << bytes << "\n";
       std::cout << "bytes_read: " << bytesRead << "\n";
       std::cout << "chunk_size: " << size << "\n";
@@ -69,25 +70,30 @@ void Request::readData(const DataCallback& callback) const
       m_httpParser.clearChunk();
       break;
     case PARSER_RESPONSE_PARSING:
+    {
+      // it probably would be dirty af, but why not pass to a callback chunk that we only have now?
+      // and then when we will recv more data chunk that to it would be dirty, but tbh we shouldnt rly need to allocate much data
+      // just tu track where \r\n started and \r\n ended
+      m_chunkPacket = std::make_unique<ChunkPacket>(this, std::move(callback));
+      m_chunkPacket->copyBuffer(buffer, bytesRead, size, characters);
 
-      //m_chunkPacket = std::make_unique<ChunkPacket>();
-      //m_chunkPacket->buffer = std::string(buffer, bytes); 
-      //m_chunkPacket->bufferOffset = bytes;
-      //m_chunkPacket->chunkSize = size;
-      //m_chunkPacket->chunkCharacters = characters;
-
-      // for size we will only allow 5 chars ye, 2 char for \r\n then size then we already have and \r\n for end
-      //std::size_t minimal = characters + 2 + size + 2;
       break;
-    default:
+    }
+    case PARSER_RESPONSE_ERROR:
+      //std::cout << "this shit aint even a chunk\n"; // return false or smth idk
+      //std::cout.write(buffer, bytesRead);
+      //std::cout << "\n";
+
+      std::cout << "bytes: " << bytes << "\n";
+      std::cout << "bytes_read: " << bytesRead << "\n";
+
+      callback({});
       m_httpParser.clearChunk();
-      break;
+      return;
     }
 
 
   }
-
-  m_dataCallback = std::move(callback);
 
 }
 
@@ -230,7 +236,7 @@ bool Request::m_headerSent(std::uint64_t headerHash) const
 
 bool Request::m_receivingData() const
 {
-  return m_dataCallback.has_value();
+  return m_chunkPacket ? true : false;
 }
 
 
@@ -247,132 +253,13 @@ std::optional<std::string_view> Request::m_getHeadersValue(std::string_view key)
 
 }
 
-// now this is ugly
-int Request::m_recvChunks()
-{
-
-  std::cout << "packet\n";
-
-  if (m_chunkPacket)
-  {
-
-    return 0;
-
-  }
-
-
-  {
-
-    char buffer[5 + 1]; // to get chunk size max 5 chars for a chunk and 6 to see it request is not too large
-
-    ssize_t bytes = recv(m_socket, buffer, sizeof(buffer), 0); 
-
-    if (bytes == 0)
-    {
-      std::cout << "CLOSE\n";
-      return -1;
-    }
-
-    if (bytes == -1)
-    {
-      std::cout << "ERR\n";
-      return -1;
-    }
-
-    m_chunkPacket = std::make_unique<ChunkPacket>();
-
-    auto [ status, bytesRead ] = m_httpParser.parse_chunk(buffer, bytes, m_chunkPacket->chunkSize, m_chunkPacket->chunkCharacters, 0);
-
-    switch (status)
-    {
-    case PARSER_RESPONSE_COMPLETE:
-      // SHOULD WE ALLOCATE A STRING
-      (*m_dataCallback)(std::string_view(buffer + m_chunkPacket->chunkCharacters + 2, m_chunkPacket->chunkSize)); 
-      m_chunkPacket.reset();
-      return 1;
-    case PARSER_RESPONSE_PARSING:
-      if (bytesRead == sizeof(buffer))
-      {
-
-        m_chunkPacket->bufferOffset += bytes;
-        m_chunkPacket->reserveAndCopy(buffer, bytes);
-
-        break;
-
-      }
-
-      std::cout << "bro this dude is wtf fucked\n";
-
-      break;
-    case PARSER_RESPONSE_ERROR:
-      return -1;
-    }
-
-  }
-
-  ssize_t bytes = recv(m_socket, m_chunkPacket->offseted(), m_chunkPacket->left(), 0);
-  std::size_t offset = m_chunkPacket->buffer.size() - m_chunkPacket->chunkCharacters - 2;
-  m_chunkPacket->buffer.resize(m_chunkPacket->buffer.size() + offset);
-
-  auto [ status, bytesRead ] = m_httpParser.parse_chunk(m_chunkPacket->offseted(), bytes, m_chunkPacket->chunkSize, m_chunkPacket->chunkCharacters, offset);
-
-  m_chunkPacket->bufferOffset += bytesRead;
-
-  return 0;
-
-}
-
-
 // return like a bool if connection needs to be closed
 int Request::m_recv()
 {
 
   // {HTTP}9\r\n123456789\r\n5\r\n12345\r\n0\r\n\r\n
 
-  if (m_receivingData()) return m_recvChunks();
-
-  if (m_receivingData())
-  {
-    char buf[512];
-
-    ssize_t bytes = recv(m_socket, buf, sizeof(buf), 0);
-    
-    if (bytes == 0)
-    {
-      std::cout << "CLOSE\n";
-      return -1;
-    }
-
-    if (bytes == -1)
-    {
-      std::cout << "ERR\n";
-      return -1;
-    }
-
-    std::uint32_t size = 0;
-    std::uint8_t chars = 0;
-
-    auto [ status, bytesRead ] = m_httpParser.parse_chunk(buf, bytes, size, chars, 0);
-
-    switch (status)
-    {
-    default:
-      break;
-    }
-
-    std::cout << "bytes: " << bytes << "\n";
-    std::cout << "bytes_read: " << bytesRead << "\n";
-    std::cout << "chunk_size: " << size << "\n";
-    std::cout << "chars: " << int(chars) << "\n";
-    std::cout << "bytes_left: " << (bytes - bytesRead) << "\n";
-
-    m_httpParser.clearChunk();
-
-    (*m_dataCallback)(std::string_view(buf, bytes)); 
-
-    return 2;
-
-  }
+  if (m_receivingData()) return m_chunkPacket->recv();
 
   if (m_bufferOffset >= m_buffer->size())
   {
@@ -425,7 +312,7 @@ void Request::m_reset()
 
   m_response = Response();
   m_response.completed = true;
-  m_dataCallback.reset();
+  m_chunkPacket.reset();
 
   headers.clear();
 

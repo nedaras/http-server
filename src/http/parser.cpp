@@ -268,7 +268,7 @@ http_parser::Parser::parse_chunk(char* buffer, std::size_t bytes, std::uint32_t&
       // and buffer, add -1 btw
 
       std::size_t bytesToSkip = size - offset;
-      std::size_t bytesSkipped = std::min(bytes, bytesToSkip);
+      std::size_t bytesSkipped = std::min(bytes - characters - 2, bytesToSkip);
 
       std::cout << "btesToSkip: " << bytesToSkip << "\n";
       std::cout << "skipped: " << bytesSkipped << "\n";
