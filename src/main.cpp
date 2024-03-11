@@ -1,4 +1,5 @@
 #include "networking/Server.h"
+    'github/copilot.vim',
 
 // TODO: add like default not found behavior
 // TODO: handle conection close

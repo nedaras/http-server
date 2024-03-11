@@ -50,7 +50,7 @@ private:
 
   void m_updateTimeout(std::time_t milliseconds) const;
 
-  int m_recv();
+  READ_RESPONSE m_read();
 
   void m_reset();
 

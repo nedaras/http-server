@@ -15,6 +15,7 @@
 #include <utility>
 #include <vector>
 
+#include "ChunkPacket.h"
 #include "Server.h"
 #include "../siphash/siphash.h"
 
@@ -57,6 +58,8 @@ void Request::readData(const DataCallback& callback) const
     // pass max_chunk size 0x10000
     auto [ status, bytesRead ] = m_httpParser.parse_chunk(buffer, bytes, size, characters, bytesReceived);
 
+    // after a loop we need to check if request is completed so we dont do stupid shit
+    // while loop and shit, on last while loop make the chunk packet
     switch (status)
     {
     case PARSER_RESPONSE_COMPLETE:
@@ -81,18 +84,10 @@ void Request::readData(const DataCallback& callback) const
       break;
     }
     case PARSER_RESPONSE_ERROR:
-      //std::cout << "this shit aint even a chunk\n"; // return false or smth idk
-      //std::cout.write(buffer, bytesRead);
-      //std::cout << "\n";
-
-      std::cout << "bytes: " << bytes << "\n";
-      std::cout << "bytes_read: " << bytesRead << "\n";
-
       callback({});
       m_httpParser.clearChunk();
       return;
     }
-
 
   }
 
@@ -255,40 +250,37 @@ std::optional<std::string_view> Request::m_getHeadersValue(std::string_view key)
 }
 
 // return like a bool if connection needs to be closed
-int Request::m_recv()
+READ_RESPONSE Request::m_read()
 {
 
   // {HTTP}9\r\n123456789\r\n5\r\n12345\r\n0\r\n\r\n
+  // dont forget to check if there is EWOULDBLOCK
 
-  if (m_receivingData()) return m_chunkPacket->recv();
+  if (m_receivingData()) return m_chunkPacket->read();
 
-  if (m_bufferOffset >= m_buffer->size())
+  if (m_bufferOffset >= m_buffer->size()) 
   {
 
+    char byte;
+    ssize_t bytes = recv(m_socket, &byte, 1, 0);
+
+    return bytes == 0 ? READ_RESPONSE_CLOSE : READ_RESPONSE_BUFFER_ERROR;
   }
 
   ssize_t bytes = recv(m_socket, m_buffer->data() + m_bufferOffset, m_buffer->size() - m_bufferOffset, 0);
 
-  if (bytes == 0)
-  {
-    std::cout << "CLOSE\n";
-    return -1;
-  }
+  if (bytes == 0) return READ_RESPONSE_CLOSE;
+  if (bytes == -1) return READ_RESPONSE_SOCKET_ERROR;
 
-  if (bytes == -1)
-  {
-    std::cout << "ERR\n";
-    return -1;
-  }
-
+  // idk how to feel that its here
   if (m_response.completed)
   {
-
     m_response.completed = false;
-
   }
 
-  auto [ a, b ] = m_httpParser.parse_http(bytes, method, path, [this](std::string_view key, std::string_view value) {
+  m_bufferOffset += bytes;
+
+  auto [ status, bytesRead ] = m_httpParser.parse_http(bytes, method, path, [this](std::string_view key, std::string_view value) {
     
     headers.push_back(std::make_pair(key, value));
 
@@ -296,15 +288,19 @@ int Request::m_recv()
 
   });
 
-  m_bufferOffset += bytes;
-  m_httpSize += b;  
+  m_httpSize += bytesRead;
 
-  //std::cout << "recv: " << bytes << "\n";
-  //std::cout << "read: " << b << "\n";
+  switch (status)
+  {
+    case PARSER_RESPONSE_COMPLETE:
+      return READ_RESPONSE_DONE;
+    case PARSER_RESPONSE_PARSING:
+      return READ_RESPONSE_WAITING;
+    default:
+      return READ_RESPONSE_PARSING_ERROR;
+  }
 
-  //std::cout << "res: " << a << "\n";
-
-  return a == PARSER_RESPONSE_COMPLETE ? 0 : a == PARSER_RESPONSE_PARSING ? 1 : -1;
+  return READ_RESPONSE_PARSING_ERROR;
 
 }
 

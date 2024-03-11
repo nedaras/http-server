@@ -7,6 +7,16 @@
 
 using DataCallback = std::function<bool(std::optional<std::string_view>)>;
 
+enum READ_RESPONSE : std::uint8_t
+{
+  READ_RESPONSE_DONE,
+  READ_RESPONSE_WAITING,
+  READ_RESPONSE_SOCKET_ERROR,
+  READ_RESPONSE_BUFFER_ERROR,
+  READ_RESPONSE_PARSING_ERROR,
+  READ_RESPONSE_CLOSE
+};
+
 class Request;
 class ChunkPacket
 {
@@ -17,9 +27,12 @@ public:
 
   void copyBuffer(const char* buffer, std::size_t size, std::uint32_t chunkSize, std::uint8_t chunkCharacters);
 
-  int recv();
+  void handleChunk();
+
+  READ_RESPONSE read();
 
   void clear();
+
 
 private:
 
