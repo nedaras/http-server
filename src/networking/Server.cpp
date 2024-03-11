@@ -137,6 +137,8 @@ int Server::listen(const char* port)
     epoll_event* events = m_events.data();
     std::size_t eventSize = m_events.size();
 
+    std::cout << "timeout: " << timeout << "\n";
+
     // imagine if event size was 2,147,483,647 + 1, so it will make event size equal to 0, wthat should we do.
     int epolls = epoll_wait(m_epoll, events, static_cast<int>(eventSize), static_cast<int>(timeout));
 
@@ -250,22 +252,24 @@ int Server::listen(const char* port)
 
       Request* request = static_cast<Request*>(m_events[i].data.ptr);
 
-      // #1 we need to know if this is like a new request
-      // #2 we need to parse **only** the http part first
+      // -- #1 we need to know if this is like a new request
+      // -- #2 we need to parse **only** the http part first
       // #3 we need to know when should a request be completed, even without calling response::end
-      // #4 client has to set if we want to recv body or recv chunked data, like with methods request::parseBody
+      // -? #4 client has to set if we want to recv body or recv chunked data, like with methods request::parseBody
       //    if not we need to throw if data is invalid or throw if they're sending data (mb this is dumb con will be closed if we not read data)
      
       // #5 how the fuck should request::parseBody even work? if lets sey they dont sent whole body in one packet
       //    mb make a macro that would early return, mb to same shit as below
       
-      // #6 fuck #5 first we need to habdle chunked encoding baby
+      // -? #6 fuck #5 first we need to habdle chunked encoding baby
       //    mb add request::parseData([request](optional<data>) -> return true)
-      //      - what it does it will just add an callback where we recv for data and if optional is null it means connection was closed
+      //      + what it does it will just add an callback where we recv for data and if optional is null it means connection was closed
       //      - return value just says if data sent was correct, if we return false connection will be terminated
       //      - if data size will be 0 it means we have recv the last chunk or everything is done
       //      - note only in call back we can call the request::end so we need to be robust and all
-      //      - cool thing is if we call this function we cann parse our left buffer and then call it in the callback
+      //      +- cool thing is if we call this function we cann parse our left buffer and then call it in the callback
+      // #7 we need to update chunked encoding timeouts to a minute we dont do it yeet we're like waiting for 5 seconds to send all data
+      //    which is even worse
 
       while (true)
       {
@@ -287,7 +291,14 @@ int Server::listen(const char* port)
 
         }
 
+        if (response == READ_RESPONSE_WAITING) break;
         if (response == READ_RESPONSE_SOCKET_ERROR && errno == EWOULDBLOCK) break;
+
+        if (response == READ_RESPONSE_CLOSE) std::cout << "CLOSE\n";
+
+        if (request->m_receivingData()) {
+          request->m_chunkPacket->handleChunk({});
+        }
 
         if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERRNO("epoll_ctl", 0);
 

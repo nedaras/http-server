@@ -25,14 +25,21 @@ public:
 
   ChunkPacket(const Request* request, const DataCallback& callback) : m_request(request), m_callback(std::move(callback)) {};
 
-  void copyBuffer(const char* buffer, std::size_t size, std::uint32_t chunkSize, std::uint8_t chunkCharacters);
+  void copyBuffer(const char* buffer, std::size_t size, std::uint32_t chunkSize, std::uint8_t chunkCharacters, std::size_t bytesReceived);
 
   void handleChunk();
+  void handleChunk(std::optional<std::string_view> data);
 
   READ_RESPONSE read();
 
   void clear();
 
+private:
+
+  std::size_t m_rawSize() const
+  {
+    return m_chunkCharacters + 2 + m_chunkSize + 2;
+  }
 
 private:
 
@@ -41,6 +48,7 @@ private:
 
   std::uint32_t m_chunkSize = 0;
   std::uint8_t m_chunkCharacters = 0;
+  static constexpr std::uint8_t m_maxChunkCharacters = 5; // would be nice if we could allow users to modify
 
   const Request* m_request;
   DataCallback m_callback;

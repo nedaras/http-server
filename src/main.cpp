@@ -1,5 +1,4 @@
 #include "networking/Server.h"
-    'github/copilot.vim',
 
 // TODO: add like default not found behavior
 // TODO: handle conection close
@@ -16,6 +15,18 @@ void Handler(const Request* request)
   request->readData([request](auto data) {
 
     std::string_view body = data.value_or("no data");
+
+    std::cout << "data_got: " << body.size() << "\n";
+
+    if (body == "no data")
+    {
+      // add close header uk
+      request->setHead("Content-Type", "text/html");
+      request->writeBody("<h1>Error!!!</h1>");
+
+      request->end();
+
+    }
 
     if (body.size() == 0) 
     {

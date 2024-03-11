@@ -23,7 +23,7 @@
 void Request::readData(const DataCallback& callback) const
 {
 
-  if (m_receivingData())
+  if (m_receivingData()) [[unlikely]]
   {
     std::cout << "bro readData call is allready set ok\n";
     return;
@@ -40,7 +40,8 @@ void Request::readData(const DataCallback& callback) const
   char* buffer = m_buffer->data() + m_httpSize;
   std::size_t bytes = m_bufferOffset - m_httpSize;
 
-  if (bytes > 0) 
+  // while loop this we like u know have some bytes to handle
+  if (bytes > 0)
   {
 
     // we need to send chunked that are inside the buffer, handle chunks that didnot fit in buffer cpy it to like a buffer or sum
@@ -70,20 +71,24 @@ void Request::readData(const DataCallback& callback) const
       std::cout << "chars: " << int(characters) << "\n";
       std::cout << "bytes_left: " << (bytes - bytesRead) << "\n";
 
-      callback(std::string_view(buffer + 2 + characters, size));
+      callback(std::string_view(buffer + characters + 2, size));
       m_httpParser.clearChunk();
+
       break;
     case PARSER_RESPONSE_PARSING:
     {
+
       // it probably would be dirty af, but why not pass to a callback chunk that we only have now?
       // and then when we will recv more data chunk that to it would be dirty, but tbh we shouldnt rly need to allocate much data
       // just tu track where \r\n started and \r\n ended
       m_chunkPacket = std::make_unique<ChunkPacket>(this, std::move(callback));
-      m_chunkPacket->copyBuffer(buffer, bytesRead, size, characters);
+      m_chunkPacket->copyBuffer(buffer, bytesRead, size, characters, bytesReceived);
 
       break;
     }
     case PARSER_RESPONSE_ERROR:
+
+      // how to like make SERVER close connection ater this
       callback({});
       m_httpParser.clearChunk();
       return;

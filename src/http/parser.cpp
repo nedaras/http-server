@@ -227,9 +227,8 @@ http_parser::Parser::parse_http(std::size_t bytes, std::string_view& method, std
 
 }
 
-// add CHUNK_DEAD state or smth or EOF and throw error if we're calling parse_chunk on CHUNK_DEAD, we will like prob need to call
-// chunk reset to reset our chunk how can an userhandle how big a chunk should be
-
+// TODO: we need like max characters broski, mb add a callback function that would call with updates size,
+//       if we dont like size we can like return false on callback
 std::tuple<PARSER_RESPONSE, std::size_t> 
 http_parser::Parser::parse_chunk(char* buffer, std::size_t bytes, std::uint32_t& size, std::uint8_t& characters, std::size_t& bytesReceived)
 {
@@ -247,8 +246,15 @@ http_parser::Parser::parse_chunk(char* buffer, std::size_t bytes, std::uint32_t&
     case CHUNK_SIZE:
       if (unhex(*buffer) != -1)
       {
+
+        // magic number ye, it means that we will only parse five chunk size characters, why?
+        // so we dont let chuks that are over 0x99999 pass this, fax it that the point is to only allow
+        // 0x10000 chunk sizes which is 5 chars
+        if (characters == 5) return TUPLE(PARSER_RESPONSE_ERROR);
+
         size = size * 16 + unhex(*buffer);
         characters++;
+
         break;
       }
 
