@@ -1,26 +1,27 @@
-#include <iostream>
+#include <gtest/gtest.h>
 #include "../src/minheap/MinHeap.h"
 
-int main()
+int TestTheTests()
+{
+  return 42;
+}
+
+TEST(Testing, Test)
 {
 
-  MinHeap<int> minheap;
+  EXPECT_EQ(TestTheTests(), 42);
 
-  minheap.push(5);
-  minheap.push(6);
-  minheap.push(-3);
+}
 
-  while (!minheap.empty())
-  {
+TEST(MinHeap, HighestElement)
+{
 
-    std::cout << minheap.top() << "\n";
+  MinHeap<int> minHeap;
 
-    minheap.pop();
+  minHeap.push(6);
+  minHeap.push(10);
+  minHeap.push(-3);
 
-  }
-
-  std::cout << "Hello Testing\n";
-
-  return 0;
+  EXPECT_EQ(minHeap.top(), 10);
 
 }
