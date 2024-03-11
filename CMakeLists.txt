@@ -10,4 +10,6 @@ project ("CMakeProject" VERSION 1.0.0)
 
 file (GLOB_RECURSE SRC_FILES src/*.cpp)
 add_executable (${PROJECT_NAME}-${PROJECT_VERSION} ${SRC_FILES})
-#target_include_directories ("Project" PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+file(GLOB_RECURSE TEST_FILES tests/*.cpp)
+add_executable (${PROJECT_NAME}-${PROJECT_VERSION}-TEST ${TEST_FILES})
