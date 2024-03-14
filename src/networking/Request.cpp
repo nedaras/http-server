@@ -40,17 +40,11 @@ void Request::readData(const DataCallback& callback) const
   char* buffer = m_buffer->data() + m_httpSize;
   std::size_t bytes = m_bufferOffset - m_httpSize;
 
-  // while loop this we like u know have some bytes to handle
-  if (bytes > 0)
+  const char* max = &buffer[bytes];
+  while (max > buffer)
   {
 
-    // we need to send chunked that are inside the buffer, handle chunks that didnot fit in buffer cpy it to like a buffer or sum
-  
-    // why dont wa pass current chunkSize and chunkCharsAmount into this function, it should be better no
-    // ok so if we get incomplete it means that a whole chunk did not fit inside the buffer, so we will need to allocate chunk buffe
-    // and copy some data
-    //
-   
+
     std::uint32_t size = 0;
     std::uint8_t characters = 0;
     std::size_t bytesReceived = 0;
@@ -59,17 +53,12 @@ void Request::readData(const DataCallback& callback) const
     // pass max_chunk size 0x10000
     auto [ status, bytesRead ] = m_httpParser.parse_chunk(buffer, bytes, size, characters, bytesReceived);
 
+
     // after a loop we need to check if request is completed so we dont do stupid shit
     // while loop and shit, on last while loop make the chunk packet
     switch (status)
     {
     case PARSER_RESPONSE_COMPLETE:
-
-      std::cout << "bytes: " << bytes << "\n";
-      std::cout << "bytes_read: " << bytesRead << "\n";
-      std::cout << "chunk_size: " << size << "\n";
-      std::cout << "chars: " << int(characters) << "\n";
-      std::cout << "bytes_left: " << (bytes - bytesRead) << "\n";
 
       callback(std::string_view(buffer + characters + 2, size));
       m_httpParser.clearChunk();
@@ -93,6 +82,9 @@ void Request::readData(const DataCallback& callback) const
       m_httpParser.clearChunk();
       return;
     }
+
+    buffer += bytesRead;
+    bytes -= bytesRead;
 
   }
 

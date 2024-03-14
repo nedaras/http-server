@@ -48,12 +48,12 @@ void Handler(const Request* request)
 
 }
 
-int main()
-{
+//int main()
+//{
 
-  Server server(Handler);
+  //Server server(Handler);
 
-  server.listen("3000");
+  //server.listen("3000");
 
-}
+//}
 

@@ -137,8 +137,6 @@ int Server::listen(const char* port)
     epoll_event* events = m_events.data();
     std::size_t eventSize = m_events.size();
 
-    std::cout << "timeout: " << timeout << "\n";
-
     // imagine if event size was 2,147,483,647 + 1, so it will make event size equal to 0, wthat should we do.
     int epolls = epoll_wait(m_epoll, events, static_cast<int>(eventSize), static_cast<int>(timeout));
 
@@ -278,7 +276,6 @@ int Server::listen(const char* port)
 
         if (response == READ_RESPONSE_DONE)
         {
-          std::cout << "is socket reading?: " << request->m_receivingData() << "\n";
 
           if (request->m_receivingData())
           { 
@@ -295,6 +292,8 @@ int Server::listen(const char* port)
         if (response == READ_RESPONSE_SOCKET_ERROR && errno == EWOULDBLOCK) break;
 
         if (response == READ_RESPONSE_CLOSE) std::cout << "CLOSE\n";
+
+        std::cout << "Errr: " << int(response) << "\n";
 
         if (request->m_receivingData()) {
           request->m_chunkPacket->handleChunk({});

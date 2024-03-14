@@ -22,9 +22,6 @@ void ChunkPacket::copyBuffer(const char* buffer, std::size_t size, std::uint32_t
     return;
   }
 
-  std::cout.write(buffer, size);
-  std::cout << "\nthis is the buffer we only have :(\n";
-  
   m_buffer.reserve(m_maxChunkCharacters);
   m_buffer.insert(m_buffer.end(), buffer, buffer + size);
 
@@ -95,7 +92,6 @@ READ_RESPONSE ChunkPacket::read()
           return READ_RESPONSE_WAITING;
         }
         if (m_rawSize() > m_buffer.capacity()) m_buffer.reserve(m_rawSize());
-        std::cout << "we parsed the size broski: " << m_chunkSize << "\n";
         break;
       default:
         return READ_RESPONSE_PARSING_ERROR;
@@ -110,8 +106,6 @@ READ_RESPONSE ChunkPacket::read()
       return READ_RESPONSE_PARSING_ERROR;
 
     }
-
-    std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n";
 
   }
 

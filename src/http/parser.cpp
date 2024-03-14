@@ -1,4 +1,5 @@
 #include "parser.h"
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <string_view>
@@ -114,7 +115,7 @@ http_parser::Parser::parse_http(std::size_t bytes, std::string_view& method, std
         if (!IS_UPPER_ALPHA(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR);
         break;
       }
-      method = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
+      method = std::string_view(m_unhandledBuffer, static_cast<std::size_t>(m_buffer - m_unhandledBuffer));
       m_http_state = REQUEST_PATH_BEGIN;
       break;
     case REQUEST_PATH_BEGIN:
@@ -128,7 +129,7 @@ http_parser::Parser::parse_http(std::size_t bytes, std::string_view& method, std
         if (!IS_URL_CHAR(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR);// mb just mb parse url too
         break;
       }
-      path = std::string_view(m_unhandledBuffer, m_buffer - m_unhandledBuffer);
+      path = std::string_view(m_unhandledBuffer, static_cast<std::size_t>(m_buffer - m_unhandledBuffer));
       m_http_state = REQUEST_H;
       break;
     case REQUEST_H:
