@@ -12,7 +12,7 @@ project ("CMakeProject" VERSION 1.0.0)
 include (cmake/UpdateSubmodules.cmake)
 
 file (GLOB_RECURSE SRC_FILES src/*.cpp)
-#add_executable (${PROJECT_NAME}-${PROJECT_VERSION} ${SRC_FILES})
+add_executable (${PROJECT_NAME}-${PROJECT_VERSION} "main.cpp" ${SRC_FILES})
 
 include (CTest)
 add_subdirectory (includes)

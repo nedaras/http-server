@@ -17,9 +17,24 @@
 
 static int setNonBlocking(int socket)
 {
-
   int flags = fcntl(socket, F_GETFL, 0);
   return flags ? fcntl(socket, F_SETFL, flags | O_NONBLOCK) : -1;
+}
+
+int Server::removeRequest(const Request* request)
+{
+
+  if (request->m_receivingData()) request->m_chunkPacket->handleChunk({});
+  if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) return -1;
+
+  m_timeouts.erase(request);
+  m_events.pop_back();
+
+  close(request->m_socket);
+
+  delete request;
+
+  return 0;
 
 }
 
@@ -115,18 +130,8 @@ int Server::listen(const char* port)
 
       if (now >= request->m_timeout)
       {
-
-        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERRNO("epoll_ctl", 0);
-
-        m_timeouts.pop();
-        m_events.pop_back();
-
-        close(request->m_socket);
-
-        delete request;
-
+        if (removeRequest(request) == -1) PRINT_ERRNO("removeRequest", 0);
         continue;
-
       }
   
       timeout = (request->m_timeout - now).count();
@@ -137,7 +142,6 @@ int Server::listen(const char* port)
     epoll_event* events = m_events.data();
     std::size_t eventSize = m_events.size();
 
-    // imagine if event size was 2,147,483,647 + 1, so it will make event size equal to 0, wthat should we do.
     int epolls = epoll_wait(m_epoll, events, static_cast<int>(eventSize), static_cast<int>(timeout));
 
     if (epolls == 0)
@@ -151,18 +155,8 @@ int Server::listen(const char* port)
 
         if (now >= request->m_timeout)
         {
-
-          if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERRNO("epoll_ctl", 0);
-
-          m_timeouts.pop();
-          m_events.pop_back();
-
-          close(request->m_socket);
-
-          delete request;
-
+          if (removeRequest(request) == -1) PRINT_ERRNO("removeRequest", 0);
           continue;
-
         }
 
         break;
@@ -173,7 +167,7 @@ int Server::listen(const char* port)
 
     }
 
-    for (int i = 0; i < epolls; i++)
+    for (std::size_t i = 0; i < static_cast<std::size_t>(epolls); i++)
     {
   
       if (m_events[i].events & EPOLLERR || m_events[i].events & EPOLLHUP)
@@ -183,15 +177,7 @@ int Server::listen(const char* port)
 
         Request* request = static_cast<Request*>(m_events[i].data.ptr);
 
-        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERRNO("epoll_ctl", 0);
-
-        m_timeouts.erase(request);
-        m_events.pop_back();
-
-        close(request->m_socket);
-
-        delete request;
-
+        if (removeRequest(request) == -1) PRINT_ERRNO("removeRequest", 0);
         break;
 
       }
@@ -203,7 +189,7 @@ int Server::listen(const char* port)
         while (true)
         {
 
-          int clientSocket = accept(m_listenSocket, nullptr, nullptr); // but these addresses in request
+          int clientSocket = accept(m_listenSocket, nullptr, nullptr); // put these addresses in request
 
           if (clientSocket == -1)
           {
@@ -263,52 +249,45 @@ int Server::listen(const char* port)
       //    mb add request::parseData([request](optional<data>) -> return true)
       //      + what it does it will just add an callback where we recv for data and if optional is null it means connection was closed
       //      - return value just says if data sent was correct, if we return false connection will be terminated
-      //      - if data size will be 0 it means we have recv the last chunk or everything is done
+      //      + if data size will be 0 it means we have recv the last chunk or everything is done
       //      - note only in call back we can call the request::end so we need to be robust and all
       //      +- cool thing is if we call this function we cann parse our left buffer and then call it in the callback
       // #7 we need to update chunked encoding timeouts to a minute we dont do it yeet we're like waiting for 5 seconds to send all data
       //    which is even worse
 
-      while (true)
+      bool loop = true;
+      while (loop)
       {
 
-        READ_RESPONSE response = request->m_read();
+        READ_RESPONSE status = request->m_read(); 
 
-        if (response == READ_RESPONSE_DONE)
+        switch(status)
         {
-
+        case READ_RESPONSE_DONE:
           if (request->m_receivingData())
-          { 
+          {
             request->m_chunkPacket->handleChunk();
-            continue;
+            break;
           }
-
           m_callback(request);
-          continue;
-
+          break;
+        case READ_RESPONSE_WAITING:
+          break;
+        case READ_RESPONSE_CLOSE:
+          if (removeRequest(request) == -1) PRINT_ERRNO("removeRequest", 0);
+          loop = false;
+          break;
+        default:
+          if (errno == EWOULDBLOCK)
+          {
+            loop = false;
+            break;
+          }
+          std::cout << "Errr: " << int(status) << "\n";
+          if (removeRequest(request) == -1) PRINT_ERRNO("removeRequest", 0);
+          loop = false;
+          break;
         }
-
-        if (response == READ_RESPONSE_WAITING) break;
-        if (response == READ_RESPONSE_SOCKET_ERROR && errno == EWOULDBLOCK) break;
-
-        if (response == READ_RESPONSE_CLOSE) std::cout << "CLOSE\n";
-
-        std::cout << "Errr: " << int(response) << "\n";
-
-        if (request->m_receivingData()) {
-          request->m_chunkPacket->handleChunk({});
-        }
-
-        if (epoll_ctl(m_epoll, EPOLL_CTL_DEL, request->m_socket, nullptr) == -1) PRINT_ERRNO("epoll_ctl", 0);
-
-        m_timeouts.erase(request);
-        m_events.pop_back();
-
-        close(request->m_socket);
-
-        delete request;
-
-        break;
 
       }
 

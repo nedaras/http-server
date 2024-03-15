@@ -16,6 +16,10 @@ public:
 
 private:
 
+  int removeRequest(const Request* request);
+
+private:
+
   friend class Request;
 
   const std::function<void(const Request* request)> m_callback;
