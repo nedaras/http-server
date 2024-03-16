@@ -92,19 +92,19 @@ static constexpr std::int8_t unhex(char c)
 // if would want to add like some special state of headers, when using POST requests we will have to refactor this code
 // to make it more simple to obtain
 
-#define TUPLE(i) std::make_tuple(i, bytesRead);
+#define TUPLE(i) std::make_tuple(i, bytes_read);
 
 // it only parsed the headers which is cool but u know
-std::tuple<PARSER_RESPONSE, std::size_t> Parser::parse_http(std::size_t bytes, std::string_view& method, std::string_view& path, const HeaderCallback& callback)
+std::tuple<http::PARSER_RESPONSE, std::size_t> http::parser::parse_http(std::size_t bytes, std::string_view& method, std::string_view& path, const header_callback& callback)
 {
 
   char* end = &m_buffer[bytes];
-  std::size_t bytesRead = 0;
+  std::size_t bytes_read = 0;
 
   while (m_buffer != end)
   {
 
-    bytesRead++;
+    bytes_read++;
 
     switch (m_http_state)
     {
@@ -114,13 +114,13 @@ std::tuple<PARSER_RESPONSE, std::size_t> Parser::parse_http(std::size_t bytes, s
         if (!IS_UPPER_ALPHA(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR);
         break;
       }
-      method = std::string_view(m_unhandledBuffer, static_cast<std::size_t>(m_buffer - m_unhandledBuffer));
+      method = std::string_view(m_unhandled_buffer, static_cast<std::size_t>(m_buffer - m_unhandled_buffer));
       m_http_state = REQUEST_PATH_BEGIN;
       break;
     case REQUEST_PATH_BEGIN:
       if (*m_buffer != '/') return TUPLE(PARSER_RESPONSE_ERROR);
       m_http_state = REQUEST_PATH;
-      m_unhandledBuffer = m_buffer;
+      m_unhandled_buffer = m_buffer;
       break;
     case REQUEST_PATH:
       if (*m_buffer != ' ')
@@ -128,7 +128,7 @@ std::tuple<PARSER_RESPONSE, std::size_t> Parser::parse_http(std::size_t bytes, s
         if (!IS_URL_CHAR(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR);// mb just mb parse url too
         break;
       }
-      path = std::string_view(m_unhandledBuffer, static_cast<std::size_t>(m_buffer - m_unhandledBuffer));
+      path = std::string_view(m_unhandled_buffer, static_cast<std::size_t>(m_buffer - m_unhandled_buffer));
       m_http_state = REQUEST_H;
       break;
     case REQUEST_H:
@@ -181,7 +181,7 @@ std::tuple<PARSER_RESPONSE, std::size_t> Parser::parse_http(std::size_t bytes, s
       // make diffrent struct that accepts A-Z;a-z;0-9;-;_;
       if (!IS_TOKEN(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR);
       m_http_state = REQUEST_HEADER_KEY;
-      m_unhandledBuffer = m_buffer;
+      m_unhandled_buffer = m_buffer;
       break;
     case REQUEST_HEADER_KEY:
       if (*m_buffer != ':') 
@@ -189,7 +189,7 @@ std::tuple<PARSER_RESPONSE, std::size_t> Parser::parse_http(std::size_t bytes, s
         if (!IS_TOKEN(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR); // is token kinda idk idk sucks
         break; 
       }
-      m_headerKey = std::string_view(m_unhandledBuffer, static_cast<std::size_t>(m_buffer - m_unhandledBuffer));
+      m_header_key = std::string_view(m_unhandled_buffer, static_cast<std::size_t>(m_buffer - m_unhandled_buffer));
       m_http_state = REQUEST_HEADER_KEY_END;
       break;
     case REQUEST_HEADER_KEY_END:
@@ -199,13 +199,13 @@ std::tuple<PARSER_RESPONSE, std::size_t> Parser::parse_http(std::size_t bytes, s
     case REQUEST_HEADER_VALUE_BEGIN:
       if (!IS_HEADER_CHAR(*m_buffer)) return TUPLE(PARSER_RESPONSE_ERROR);
       m_http_state = REQUEST_HEADER_VALUE;
-      m_unhandledBuffer = m_buffer;
+      m_unhandled_buffer = m_buffer;
       break;
     case REQUEST_HEADER_VALUE:
       if (*m_buffer == '\r')
       {
-        std::string_view headerValue(m_unhandledBuffer, static_cast<std::size_t>(m_buffer - m_unhandledBuffer));
-        if (!callback(m_headerKey, headerValue)) return TUPLE(PARSER_RESPONSE_ERROR);
+        std::string_view headerValue(m_unhandled_buffer, static_cast<std::size_t>(m_buffer - m_unhandled_buffer));
+        if (!callback(m_header_key, headerValue)) return TUPLE(PARSER_RESPONSE_ERROR);
         m_http_state = REQUEST_HEADER_END;
         break;
       }
@@ -229,16 +229,16 @@ std::tuple<PARSER_RESPONSE, std::size_t> Parser::parse_http(std::size_t bytes, s
 
 // TODO: we need like max characters broski, mb add a callback function that would call with updates size,
 //       if we dont like size we can like return false on callback
-std::tuple<PARSER_RESPONSE, std::size_t> Parser::parse_chunk(char* buffer, std::size_t bytes, std::uint32_t& size, std::uint8_t& characters, std::size_t& bytesReceived)
+std::tuple<http::PARSER_RESPONSE, std::size_t> http::parser::parse_chunk(char* buffer, std::size_t bytes, std::uint32_t& size, std::uint8_t& characters, std::size_t& bytes_received)
 {
 
   char* end = &buffer[bytes];
-  std::size_t bytesRead = 0;
+  std::size_t bytes_read = 0;
 
   while (buffer != end)
   {
 
-    bytesRead++;
+    bytes_read++;
 
     switch (m_chunk_state)
     {
@@ -259,7 +259,7 @@ std::tuple<PARSER_RESPONSE, std::size_t> Parser::parse_chunk(char* buffer, std::
 
       if (*buffer != '\r') return TUPLE(PARSER_RESPONSE_ERROR);
 
-      m_chunkSizeParsed = true;
+      m_chunk_size_parsed = true;
       m_chunk_state = CHUNK_BEGIN;
 
       break;
@@ -270,18 +270,18 @@ std::tuple<PARSER_RESPONSE, std::size_t> Parser::parse_chunk(char* buffer, std::
     case CHUNK_BODY:
     {
 
-      bytesRead--;
+      bytes_read--;
       buffer--;
 
-      std::size_t bytesToSkip = size - bytesReceived;
-      std::size_t bytesSkipped = std::min(bytes - bytesRead, bytesToSkip);
+      std::size_t bytes_to_skip = size - bytes_received;
+      std::size_t bytes_skipped = std::min(bytes - bytes_read, bytes_to_skip);
 
-      bytesRead += bytesSkipped;
-      buffer += bytesSkipped;
+      bytes_read += bytes_skipped;
+      buffer += bytes_skipped;
 
-      bytesReceived += bytesSkipped;
+      bytes_received += bytes_skipped;
 
-      if (bytesToSkip == bytesSkipped) m_chunk_state = CHUNK_END;
+      if (bytes_to_skip == bytes_skipped) m_chunk_state = CHUNK_END;
 
       break;
     }
@@ -302,22 +302,22 @@ std::tuple<PARSER_RESPONSE, std::size_t> Parser::parse_chunk(char* buffer, std::
 
 }
 
-void Parser::clearChunk()
+void http::parser::clear_chunk()
 {
 
   m_chunk_state = CHUNK_SIZE;
-  m_chunkSizeParsed = false;
+  m_chunk_size_parsed = false;
 
 }
 
-void Parser::clear(char* buffer)
+void http::parser::clear(char* buffer)
 {
 
   m_buffer = buffer;
-  m_unhandledBuffer = buffer;
+  m_unhandled_buffer = buffer;
 
   m_http_state = REQUEST_METHOD;
   
-  clearChunk();
+  clear_chunk();
 
 }

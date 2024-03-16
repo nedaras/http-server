@@ -89,7 +89,7 @@ namespace http
       std::unique_ptr<std::array<char, 8 * 1024>> m_buffer = std::make_unique<std::array<char, 8 * 1024>>();
 
       mutable std::unique_ptr<http::chunk_packet> m_chunk_packet;
-      mutable Parser m_http_parser;
+      mutable http::parser m_http_parser;
       mutable std::chrono::milliseconds m_timeout;
       mutable Response m_response {};
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "request.h"
-#include "../minheap/MinHeap.h"
+#include "../minheap/minheap.h"
 #include <functional>
 #include <sys/epoll.h>
 
@@ -40,7 +40,7 @@ namespace http
       request_handler m_callback;
 
       std::vector<epoll_event> m_events;
-      MinHeap<const http::request*, compare_requests> m_timeouts; // remove const
+      minheap<const http::request*, compare_requests> m_timeouts; // remove const
 
       int m_listen_socket;
       int m_epoll;

@@ -1,20 +1,18 @@
 #pragma once
 
 #include <functional>
-#include <iostream>
-#include <queue>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
 template <typename T, typename Compare = std::less<T>>
-class MinHeap
+class minheap
 {
 
 public:
 
-  MinHeap() = default;
+  minheap() = default;
 
   bool empty() const
   {

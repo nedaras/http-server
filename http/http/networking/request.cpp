@@ -62,7 +62,7 @@ void http::request::read_data(const http::data_callback& callback) const
     case PARSER_RESPONSE_COMPLETE:
 
       callback(std::string_view(buffer + characters + 2, size));
-      m_http_parser.clearChunk();
+      m_http_parser.clear_chunk();
 
       break;
     case PARSER_RESPONSE_PARSING:
@@ -80,7 +80,7 @@ void http::request::read_data(const http::data_callback& callback) const
 
       // how to like make SERVER close connection ater this
       callback({});
-      m_http_parser.clearChunk();
+      m_http_parser.clear_chunk();
       return;
     }
 

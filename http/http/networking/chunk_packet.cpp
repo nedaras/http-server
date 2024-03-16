@@ -13,7 +13,7 @@ void http::chunk_packet::copy_buffer(const char* buffer, std::size_t size, std::
   m_chunk_characters = chunk_characters;
   m_bytes_received = bytes_received;
 
-  if (m_request->m_http_parser.chunkSizeParsed())
+  if (m_request->m_http_parser.chunk_size_parsed())
   {
     
     m_buffer.reserve(m_raw_size());
@@ -45,7 +45,7 @@ void http::chunk_packet::handle_chunk(std::optional<std::string_view> data)
 http::READ_RESPONSE http::chunk_packet::read()
 {
 
-  if (!m_request->m_http_parser.chunkSizeParsed())
+  if (!m_request->m_http_parser.chunk_size_parsed())
   {
 
     if (m_chunk_characters > m_max_chunk_characters)
@@ -87,7 +87,7 @@ http::READ_RESPONSE http::chunk_packet::read()
         }
         return READ_RESPONSE_DONE;
       case PARSER_RESPONSE_PARSING:
-        if (!m_request->m_http_parser.chunkSizeParsed())
+        if (!m_request->m_http_parser.chunk_size_parsed())
         {
           return READ_RESPONSE_WAITING;
         }
@@ -99,7 +99,7 @@ http::READ_RESPONSE http::chunk_packet::read()
 
     }
 
-    if (!m_request->m_http_parser.chunkSizeParsed())
+    if (!m_request->m_http_parser.chunk_size_parsed())
     {
 
       std::cout << "how can it not even be parsed?????????\n";
@@ -140,7 +140,7 @@ void http::chunk_packet::clear()
 
   // clear a vector that will sooner or later be allocated to same size is kinda no no
   m_buffer.clear();
-  m_request->m_http_parser.clearChunk();
+  m_request->m_http_parser.clear_chunk();
 
   m_bytes_received = 0;
   m_chunk_size = 0;
