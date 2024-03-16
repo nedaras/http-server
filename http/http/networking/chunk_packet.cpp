@@ -1,40 +1,40 @@
-#include "ChunkPacket.h"
+#include "chunk_packet.h"
 
 #include <iostream>
 #include <string_view>
 #include <sys/socket.h>
 
-#include "Request.h"
+#include "request.h"
 
-void ChunkPacket::copyBuffer(const char* buffer, std::size_t size, std::uint32_t chunkSize, std::uint8_t chunkCharacters, std::size_t bytesReceived)
+void http::chunk_packet::copy_buffer(const char* buffer, std::size_t size, std::uint32_t chunk_size, std::uint8_t chunk_characters, std::size_t bytes_received)
 {
 
-  m_chunkSize = chunkSize;
-  m_chunkCharacters = chunkCharacters;
-  m_bytesReceived = bytesReceived;
+  m_chunk_size = chunk_size;
+  m_chunk_characters = chunk_characters;
+  m_bytes_received = bytes_received;
 
-  if (m_request->m_httpParser.chunkSizeParsed())
+  if (m_request->m_http_parser.chunkSizeParsed())
   {
     
-    m_buffer.reserve(m_rawSize());
+    m_buffer.reserve(m_raw_size());
     m_buffer.insert(m_buffer.end(), buffer, buffer + size);
 
     return;
   }
 
-  m_buffer.reserve(m_maxChunkCharacters);
+  m_buffer.reserve(m_max_chunk_characters);
   m_buffer.insert(m_buffer.end(), buffer, buffer + size);
 
 }
 
 
-void ChunkPacket::handleChunk()
+void http::chunk_packet::handle_chunk()
 {
-  std::string_view chunk(m_buffer.data() + m_chunkCharacters + 2, m_chunkSize);
-  handleChunk(chunk);
+  std::string_view chunk(m_buffer.data() + m_chunk_characters + 2, m_chunk_size);
+  handle_chunk(chunk);
 }
 
-void ChunkPacket::handleChunk(std::optional<std::string_view> data)
+void http::chunk_packet::handle_chunk(std::optional<std::string_view> data)
 {
   m_callback(data);
   clear();
@@ -42,13 +42,13 @@ void ChunkPacket::handleChunk(std::optional<std::string_view> data)
 
 // the fact that we're storing that 0\r\n and \r\n is fucking dumb our array istead of 65536 becomes 65545
 // if we allow payload of 0x1000 size
-READ_RESPONSE ChunkPacket::read()
+http::READ_RESPONSE http::chunk_packet::read()
 {
 
-  if (!m_request->m_httpParser.chunkSizeParsed())
+  if (!m_request->m_http_parser.chunkSizeParsed())
   {
 
-    if (m_chunkCharacters > m_maxChunkCharacters)
+    if (m_chunk_characters > m_max_chunk_characters)
     {
       std::cout << "why didn't we handled the chunk characters overflow\n";
       return READ_RESPONSE_BUFFER_ERROR;
@@ -56,10 +56,10 @@ READ_RESPONSE ChunkPacket::read()
 
     {
       
-      char buffer[m_maxChunkCharacters];
-      std::uint8_t bufferSize = m_maxChunkCharacters - m_chunkCharacters;
+      char buffer[m_max_chunk_characters];
+      std::uint8_t buffer_size = m_max_chunk_characters - m_chunk_characters;
 
-      ssize_t bytes = recv(m_request->m_socket, buffer, bufferSize, 0);
+      ssize_t bytes = recv(m_request->m_socket, buffer, buffer_size, 0);
 
       if (bytes == 0) return READ_RESPONSE_CLOSE;
       if (bytes == -1) return READ_RESPONSE_SOCKET_ERROR;
@@ -68,13 +68,13 @@ READ_RESPONSE ChunkPacket::read()
       m_buffer.insert(m_buffer.end(), buffer, buffer + bytes);
 
       // YEYE its ugly we will fix it when we will rwite directly to the m_buffer
-      auto [ status, bytesRead ] = m_request->m_httpParser.parse_chunk(m_buffer.data() + m_buffer.size() - bytes, bytes, m_chunkSize, m_chunkCharacters, m_bytesReceived);
+      auto [ status, bytesRead ] = m_request->m_http_parser.parse_chunk(m_buffer.data() + m_buffer.size() - bytes, static_cast<std::size_t>(bytes), m_chunk_size, m_chunk_characters, m_bytes_received);
 
       switch (status)
       {
       case PARSER_RESPONSE_COMPLETE:
         // remove this magic 2 plus bullshit in a function
-        // and we have a problem the end chunk is 0\r\n\r\n which is 5 chars like our m_maxChunkCharacters
+        // and we have a problem the end chunk is 0\r\n\r\n which is 5 chars like our m_max_chunk_characters
         // it means that we dont have a problem, but lets say we habe max chars set to 6 and we have this nessage to revv:
         // 0\r\n\r\n3\r\n123\r\n, its a dumb chunk but idk mb that how it has to be, by reading 6 chars we will read "0\r\n\r\n3"
         // and we will forget about that read '3' char so wehen we will try to recv we will get "\r\n123\r\n"
@@ -87,11 +87,11 @@ READ_RESPONSE ChunkPacket::read()
         }
         return READ_RESPONSE_DONE;
       case PARSER_RESPONSE_PARSING:
-        if (!m_request->m_httpParser.chunkSizeParsed())
+        if (!m_request->m_http_parser.chunkSizeParsed())
         {
           return READ_RESPONSE_WAITING;
         }
-        if (m_rawSize() > m_buffer.capacity()) m_buffer.reserve(m_rawSize());
+        if (m_raw_size() > m_buffer.capacity()) m_buffer.reserve(m_raw_size());
         break;
       default:
         return READ_RESPONSE_PARSING_ERROR;
@@ -99,7 +99,7 @@ READ_RESPONSE ChunkPacket::read()
 
     }
 
-    if (!m_request->m_httpParser.chunkSizeParsed())
+    if (!m_request->m_http_parser.chunkSizeParsed())
     {
 
       std::cout << "how can it not even be parsed?????????\n";
@@ -119,7 +119,7 @@ READ_RESPONSE ChunkPacket::read()
   // AND FUCK RHIS IS EVIL, we can use our own size and fucking ignore std::size, a hot fix or just make my own array
   m_buffer.insert(m_buffer.end(), buffer, buffer + bytes);
 
-  auto [ status, bytesRead ] = m_request->m_httpParser.parse_chunk(buffer, bytes, m_chunkSize, m_chunkCharacters, m_bytesReceived);
+  auto [ status, bytes_read ] = m_request->m_http_parser.parse_chunk(buffer, static_cast<std::size_t>(bytes), m_chunk_size, m_chunk_characters, m_bytes_received);
 
   switch (status)
   {
@@ -135,15 +135,15 @@ READ_RESPONSE ChunkPacket::read()
 
 }
 
-void ChunkPacket::clear()
+void http::chunk_packet::clear()
 {
 
   // clear a vector that will sooner or later be allocated to same size is kinda no no
   m_buffer.clear();
-  m_request->m_httpParser.clearChunk();
+  m_request->m_http_parser.clearChunk();
 
-  m_bytesReceived = 0;
-  m_chunkSize = 0;
-  m_chunkCharacters = 0;
+  m_bytes_received = 0;
+  m_chunk_size = 0;
+  m_chunk_characters = 0;
 
 }

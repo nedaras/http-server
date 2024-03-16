@@ -10,21 +10,23 @@ set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/x64)
 project ("CMakeProject" VERSION 1.0.0)
 
 include (cmake/UpdateSubmodules.cmake)
+include (CTest)
 
+add_subdirectory (includes)
 add_subdirectory(http)
+
 add_executable (${PROJECT_NAME}-${PROJECT_VERSION} main.cpp)
 target_link_libraries(${PROJECT_NAME}-${PROJECT_VERSION} PUBLIC http)
 
-#include (CTest)
-#add_subdirectory (includes)
+if (BUILD_TESTING)
 
-#if (BUILD_TESTING)
+  file (GLOB_RECURSE TEST_FILES tests/*.cpp)
+  add_executable (${PROJECT_NAME}-${PROJECT_VERSION}-TEST ${TEST_FILES} ${SRC_FILES})
 
-#file (GLOB_RECURSE TEST_FILES tests/*.cpp)
-#  add_executable (${PROJECT_NAME}-${PROJECT_VERSION}-TEST ${TEST_FILES} ${SRC_FILES})
-#  target_link_libraries (${PROJECT_NAME}-${PROJECT_VERSION}-TEST PRIVATE GTest::gtest_main)
+  target_link_libraries (${PROJECT_NAME}-${PROJECT_VERSION}-TEST PRIVATE GTest::gtest_main)
+  target_link_libraries (${PROJECT_NAME}-${PROJECT_VERSION}-TEST PUBLIC http)
 
-#  include (GoogleTest)
-#  gtest_discover_tests (${PROJECT_NAME}-${PROJECT_VERSION}-TEST)
+  include (GoogleTest)
+  gtest_discover_tests (${PROJECT_NAME}-${PROJECT_VERSION}-TEST)
 
-#endif()
+endif()

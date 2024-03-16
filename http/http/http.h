@@ -1,10 +1,10 @@
 #pragma once
 
-#include "networking/Server.h"
+#include "networking/server.h"
 
 namespace http
 {
 
-  Server createServer(const RequestHandler& callback);
+  http::server createServer(const http::request_handler& callback);
 
 }

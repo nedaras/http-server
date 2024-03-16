@@ -26,12 +26,12 @@ static std::vector<char> getFile(fs::path path)
 
 }
 
-static void Handler(const Request* request)
+static void Handler(const http::request* request)
 {
 
   std::vector<char> buffer = getFile("../index.html");
 
-  request->writeBody(buffer.data());
+  request->write_body(buffer.data());
   request->end();
 
 }
@@ -39,7 +39,7 @@ static void Handler(const Request* request)
 int main()
 {
 
-  Server server = http::createServer(Handler);
+  http::server server = http::createServer(Handler);
   server.listen("3000");
 
   return 0;

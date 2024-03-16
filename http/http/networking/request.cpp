@@ -1,7 +1,8 @@
-#include "Request.h"
+#include "request.h"
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <ctime>
@@ -15,21 +16,21 @@
 #include <utility>
 #include <vector>
 
-#include "ChunkPacket.h"
-#include "Server.h"
+#include "chunk_packet.h"
+#include "server.h"
 #include "../siphash/siphash.h"
 
 // TODO: first we need to check if Chunked encoding is sent if not throw send empty optional
-void Request::readData(const DataCallback& callback) const
+void http::request::read_data(const http::data_callback& callback) const
 {
 
-  if (m_receivingData()) [[unlikely]]
+  if (m_receiving_data()) [[unlikely]]
   {
     std::cout << "bro readData call is allready set ok\n";
     return;
   }
 
-  std::optional<std::string_view> value = m_getHeadersValue("Transfer-Encoding");
+  std::optional<std::string_view> value = m_get_headers_value("Transfer-Encoding");
 
   if (!value)
   {
@@ -37,8 +38,8 @@ void Request::readData(const DataCallback& callback) const
     return;
   }
 
-  char* buffer = m_buffer->data() + m_httpSize;
-  std::size_t bytes = m_bufferOffset - m_httpSize;
+  char* buffer = m_buffer->data() + m_http_size;
+  std::size_t bytes = m_buffer_offset - m_http_size;
 
   const char* max = &buffer[bytes];
   while (max > buffer)
@@ -47,11 +48,11 @@ void Request::readData(const DataCallback& callback) const
 
     std::uint32_t size = 0;
     std::uint8_t characters = 0;
-    std::size_t bytesReceived = 0;
+    std::size_t bytes_received = 0;
 
     // TODO: idk we can make Packet struct, tha would like contain buffer and a size, and like expected max size idk
     // pass max_chunk size 0x10000
-    auto [ status, bytesRead ] = m_httpParser.parse_chunk(buffer, bytes, size, characters, bytesReceived);
+    auto [ status, bytes_read ] = m_http_parser.parse_chunk(buffer, bytes, size, characters, bytes_received);
 
 
     // after a loop we need to check if request is completed so we dont do stupid shit
@@ -61,7 +62,7 @@ void Request::readData(const DataCallback& callback) const
     case PARSER_RESPONSE_COMPLETE:
 
       callback(std::string_view(buffer + characters + 2, size));
-      m_httpParser.clearChunk();
+      m_http_parser.clearChunk();
 
       break;
     case PARSER_RESPONSE_PARSING:
@@ -70,8 +71,8 @@ void Request::readData(const DataCallback& callback) const
       // it probably would be dirty af, but why not pass to a callback chunk that we only have now?
       // and then when we will recv more data chunk that to it would be dirty, but tbh we shouldnt rly need to allocate much data
       // just tu track where \r\n started and \r\n ended
-      m_chunkPacket = std::make_unique<ChunkPacket>(this, std::move(callback));
-      m_chunkPacket->copyBuffer(buffer, bytesRead, size, characters, bytesReceived);
+      m_chunk_packet = std::make_unique<http::chunk_packet>(this, std::move(callback));
+      m_chunk_packet->copy_buffer(buffer, bytes_read, size, characters, bytes_received);
 
       break;
     }
@@ -79,12 +80,12 @@ void Request::readData(const DataCallback& callback) const
 
       // how to like make SERVER close connection ater this
       callback({});
-      m_httpParser.clearChunk();
+      m_http_parser.clearChunk();
       return;
     }
 
-    buffer += bytesRead;
-    bytes -= bytesRead;
+    buffer += bytes_read;
+    bytes -= bytes_read;
 
   }
 
@@ -92,26 +93,26 @@ void Request::readData(const DataCallback& callback) const
 
 // TODO: make a function that would like get from 200 - OK or like 500 - Server Error messages
 // TODO: make it throw error if status is already set
-void Request::setStatus(std::uint16_t status) const
+void http::request::set_status(std::uint16_t status) const
 {
 
-  if (m_response.statusSent) return;
+  if (m_response.status_sent) return;
 
   send(m_socket, "HTTP/1.1 ", strlen("HTTP/1.1 "), 0);
   send(m_socket, std::to_string(status).data(), std::to_string(status).size(), 0);
   send(m_socket, "\r\n", 2, 0);
 
-  m_response.statusSent = true;
+  m_response.status_sent = true;
 
 }
 
-void Request::setHead(std::string_view key, std::string_view value) const
+void http::request::set_head(std::string_view key, std::string_view value) const
 {
 
-  std::uint64_t hash = m_hashString(key);
+  std::uint64_t hash = m_hash_string(key);
 
   // THREAD_LOCK
-  if (m_headerSent(hash)) [[unlikely]]
+  if (m_header_sent(hash)) [[unlikely]]
   {
 
     std::cout << "why the fuck u sending same headers\n";
@@ -120,14 +121,14 @@ void Request::setHead(std::string_view key, std::string_view value) const
 
   }
 
-  m_setHead(key, value, hash);
+  m_set_head(key, value, hash);
 
 }
 
-void Request::m_setHead(std::string_view key, std::string_view value, std::uint64_t hash) const
+void http::request::m_set_head(std::string_view key, std::string_view value, std::uint64_t hash) const
 {
 
-  setStatus(200);
+  set_status(200);
 
   send(m_socket, key.data(), key.size(), 0);
   send(m_socket, ": ", 2, 0);
@@ -135,22 +136,22 @@ void Request::m_setHead(std::string_view key, std::string_view value, std::uint6
   send(m_socket, "\r\n", 2, 0);
 
   // THREAD_LOCK
-  m_response.sentHeaders.push_back(hash);
+  m_response.sent_headers.push_back(hash);
 
 }
 
-void Request::writeBody(std::string_view buffer) const
+void http::request::write_body(std::string_view buffer) const
 {
-  writeBody(buffer.data(), buffer.size());
+  write_body(buffer.data(), buffer.size());
 }
 // NOTE: mb add err handling, if we call write body twice?
-void Request::writeBody(const char* buffer, std::size_t size) const
+void http::request::write_body(const char* buffer, std::size_t size) const
 {
 
-  m_setDate();
-  m_setConnection();
-  m_setKeepAlive();
-  m_setContentLength(size);
+  m_set_date();
+  m_set_connection();
+  m_set_keep_alive();
+  m_set_content_length(size);
 
   send(m_socket, "\r\n", 2, 0);
   send(m_socket, buffer, size, 0);
@@ -158,19 +159,19 @@ void Request::writeBody(const char* buffer, std::size_t size) const
 }
 
 // THREAD_LOCK
-void Request::end() const
+void http::request::end() const
 {
   
-  m_updateTimeout(5000);
-  const_cast<Request*>(this)->m_reset(); // red fucking flag
+  m_update_timeout(5000);
+  const_cast<http::request*>(this)->m_reset(); // red fucking flag
   
 }
 
-void Request::m_setDate() const
+void http::request::m_set_date() const
 {
 
-  static std::uint64_t hash = m_hashString("Date");
-  if (m_headerSent(hash)) return; 
+  static std::uint64_t hash = m_hash_string("Date");
+  if (m_header_sent(hash)) return; 
 
   // for null termination
   char date[29 + 1];
@@ -178,31 +179,31 @@ void Request::m_setDate() const
   std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()); 
   std::strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S GMT", std::gmtime(&now));
 
-  m_setHead("Date", date, hash);
+  m_set_head("Date", date, hash);
 
 }
 
-void Request::m_setContentLength(std::size_t length) const
+void http::request::m_set_content_length(std::size_t length) const
 {
-  static std::uint64_t hash = m_hashString("Content-Length");
-  if (!m_headerSent(hash)) m_setHead("Content-Length", std::to_string(length), hash);
+  static std::uint64_t hash = m_hash_string("Content-Length");
+  if (!m_header_sent(hash)) m_set_head("Content-Length", std::to_string(length), hash);
 }
 
-void Request::m_setConnection() const
+void http::request::m_set_connection() const
 {
-  static std::uint64_t hash = m_hashString("Connection");
-  if (!m_headerSent(hash)) m_setHead("Connection", "keep-alive", hash);
+  static std::uint64_t hash = m_hash_string("Connection");
+  if (!m_header_sent(hash)) m_set_head("Connection", "keep-alive", hash);
 }
 
 // TODO: only send keep alive if connection is keep alive
-void Request::m_setKeepAlive() const
+void http::request::m_set_keep_alive() const
 {
-  static std::uint64_t hash = m_hashString("Keep-Alive");
-  if (!m_headerSent(hash)) m_setHead("Keep-Alive", "timeout=5", hash);
+  static std::uint64_t hash = m_hash_string("Keep-Alive");
+  if (!m_header_sent(hash)) m_set_head("Keep-Alive", "timeout=5", hash);
 }
 
 // THREAD_LOCK
-void Request::m_updateTimeout(std::time_t milliseconds) const
+void http::request::m_update_timeout(std::time_t milliseconds) const
 {
 
   m_server->m_timeouts.erase(this);
@@ -211,34 +212,34 @@ void Request::m_updateTimeout(std::time_t milliseconds) const
 
 }
 
-std::uint64_t Request::m_hashString(std::string_view string) const
+std::uint64_t http::request::m_hash_string(std::string_view string) const
 {
   std::uintptr_t key = reinterpret_cast<std::uintptr_t>(m_server->m_callback.target<void>());
   return siphash::siphash_xy(string.data(), string.size(), 1, 3, reinterpret_cast<std::uintptr_t>(m_server), key);
 }
 
 // THREAD_LOCK
-bool Request::m_headerSent(std::uint64_t headerHash) const
+bool http::request::m_header_sent(std::uint64_t header_hash) const
 {
 
-  for (std::uint64_t hash : m_response.sentHeaders) if (headerHash == hash) return true;
+  for (std::uint64_t hash : m_response.sent_headers) if (header_hash == hash) return true;
   
   return false;
 
 }
 
-bool Request::m_receivingData() const
+bool http::request::m_receiving_data() const
 {
-  return m_chunkPacket ? true : false;
+  return m_chunk_packet ? true : false;
 }
 
 
-std::optional<std::string_view> Request::m_getHeadersValue(std::string_view key) const
+std::optional<std::string_view> http::request::m_get_headers_value(std::string_view key) const
 {
 
-  using HeaderObject = std::tuple<std::string_view, std::string_view>;
-  std::vector<HeaderObject>::const_iterator iterator = std::find_if(headers.begin(), headers.end(), [&](const HeaderObject& header) {
-    return std::get<0>(header) == key;
+  using header = std::tuple<std::string_view, std::string_view>;
+  std::vector<header>::const_iterator iterator = std::find_if(headers.begin(), headers.end(), [&](const header& head) {
+    return std::get<0>(head) == key;
   });
 
   if  (iterator == headers.end()) return {};
@@ -247,15 +248,15 @@ std::optional<std::string_view> Request::m_getHeadersValue(std::string_view key)
 }
 
 // return like a bool if connection needs to be closed
-READ_RESPONSE Request::m_read()
+http::READ_RESPONSE http::request::m_read()
 {
 
   // {HTTP}9\r\n123456789\r\n5\r\n12345\r\n0\r\n\r\n
   // dont forget to check if there is EWOULDBLOCK
 
-  if (m_receivingData()) return m_chunkPacket->read();
+  if (m_receiving_data()) return m_chunk_packet->read();
 
-  if (m_bufferOffset >= m_buffer->size()) 
+  if (m_buffer_offset >= m_buffer->size()) 
   {
 
     char byte;
@@ -264,7 +265,7 @@ READ_RESPONSE Request::m_read()
     return bytes == 0 ? READ_RESPONSE_CLOSE : READ_RESPONSE_BUFFER_ERROR;
   }
 
-  ssize_t bytes = recv(m_socket, m_buffer->data() + m_bufferOffset, m_buffer->size() - m_bufferOffset, 0);
+  ssize_t bytes = recv(m_socket, m_buffer->data() + m_buffer_offset, m_buffer->size() - m_buffer_offset, 0);
 
   if (bytes == 0) return READ_RESPONSE_CLOSE;
   if (bytes == -1) return READ_RESPONSE_SOCKET_ERROR;
@@ -275,9 +276,9 @@ READ_RESPONSE Request::m_read()
     m_response.completed = false;
   }
 
-  m_bufferOffset += bytes;
+  m_buffer_offset += static_cast<std::size_t>(bytes);
 
-  auto [ status, bytesRead ] = m_httpParser.parse_http(bytes, method, path, [this](std::string_view key, std::string_view value) {
+  auto [ status, bytes_read ] = m_http_parser.parse_http(static_cast<std::size_t>(bytes), method, path, [this](std::string_view key, std::string_view value) {
     
     headers.push_back(std::make_pair(key, value));
 
@@ -285,7 +286,7 @@ READ_RESPONSE Request::m_read()
 
   });
 
-  m_httpSize += bytesRead;
+  m_http_size += bytes_read;
 
   switch (status)
   {
@@ -301,17 +302,17 @@ READ_RESPONSE Request::m_read()
 
 }
 
-void Request::m_reset()
+void http::request::m_reset()
 {
 
   m_response = Response();
   m_response.completed = true;
-  m_chunkPacket.reset();
+  m_chunk_packet.reset();
 
   headers.clear();
 
-  m_httpParser.clear(m_buffer->data());
-  m_bufferOffset = 0;
-  m_httpSize = 0;
+  m_http_parser.clear(m_buffer->data());
+  m_buffer_offset = 0;
+  m_http_size = 0;
 
 }

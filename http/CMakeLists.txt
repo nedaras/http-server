@@ -5,9 +5,9 @@ project(http VERSION 1.0)
 
 set(HTTP_SRC_FILES
   http/http.cpp
-  http/networking/Server.cpp
-  http/networking/Request.cpp
-  http/networking/ChunkPacket.cpp
+  http/networking/server.cpp
+  http/networking/request.cpp
+  http/networking/chunk_packet.cpp
   http/parser/parser.cpp
   http/siphash/siphash.cpp
 )
