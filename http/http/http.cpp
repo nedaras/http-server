@@ -1,6 +1,6 @@
 #include "http.h"
 
-http::server http::createServer(const http::request_handler& callback)
+http::server http::create_server(const http::request_handler& callback)
 {
   return http::server(std::move(callback));
 }

@@ -70,13 +70,13 @@ static int init_socket()
 
 }
 
-TEST(Request, readData_reading_incomplete_buffers)
+TEST(server_request, reading_incomplete_buffers)
 {
 
   std::thread([] {
 
     
-    http::server server = http::createServer([](const http::request* request) {
+    http::server server = http::create_server([](const http::request* request) {
 
       request->read_data(std::bind(handle_data, request, std::placeholders::_1));
 

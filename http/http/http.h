@@ -5,6 +5,6 @@
 namespace http
 {
 
-  http::server createServer(const http::request_handler& callback);
+  http::server create_server(const http::request_handler& callback);
 
 }

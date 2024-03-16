@@ -1,3 +1,16 @@
+# http/1.1 server built using cpp 20
+
+* A fast and small HTTP/1.1 server.
+* Simple to use api.
+
+### Important to Note
+
+* There are no json or query parsers.
+* Server currently does not support multithreading.
+
+### hello
+
+```cpp
 #include <http/http.h>
 #include <fstream>
 #include <iostream>
@@ -47,3 +60,4 @@ int main()
   return 0;
 
 }
+```

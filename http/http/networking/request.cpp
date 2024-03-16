@@ -15,7 +15,6 @@
 #include <tuple>
 #include <utility>
 #include <vector>
-
 #include "chunk_packet.h"
 #include "server.h"
 #include "../siphash/siphash.h"
@@ -34,7 +33,7 @@ void http::request::read_data(const http::data_callback& callback) const
 
   if (!value)
   {
-    std::cout << "err this dude aint even sending data\n";
+    callback({});
     return;
   }
 
@@ -45,7 +44,6 @@ void http::request::read_data(const http::data_callback& callback) const
   while (max > buffer)
   {
 
-
     std::uint32_t size = 0;
     std::uint8_t characters = 0;
     std::size_t bytes_received = 0;
@@ -53,7 +51,6 @@ void http::request::read_data(const http::data_callback& callback) const
     // TODO: idk we can make Packet struct, tha would like contain buffer and a size, and like expected max size idk
     // pass max_chunk size 0x10000
     auto [ status, bytes_read ] = m_http_parser.parse_chunk(buffer, bytes, size, characters, bytes_received);
-
 
     // after a loop we need to check if request is completed so we dont do stupid shit
     // while loop and shit, on last while loop make the chunk packet
