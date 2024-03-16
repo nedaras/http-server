@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "../http/parser.h"
+#include "../parser/parser.h"
 #include "ChunkPacket.h"
 
 // TODO: bro dont do request as a const, not cool
@@ -86,7 +86,7 @@ private:
   std::unique_ptr<std::array<char, 8 * 1024>> m_buffer = std::make_unique<std::array<char, 8 * 1024>>();
 
   mutable std::unique_ptr<ChunkPacket> m_chunkPacket;
-  mutable http_parser::Parser m_httpParser;
+  mutable Parser m_httpParser;
   mutable std::chrono::milliseconds m_timeout;
   mutable Response m_response {};
 

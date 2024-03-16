@@ -3,9 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <memory>
 #include <string_view>
-#include <vector>
 
 // TODO: if node's http parser is fast we can just implement it here
 //       we still dont handle querues and dont check if an url even is logical, but node's parser would handle that for use
@@ -17,22 +15,18 @@ enum PARSER_RESPONSE
   PARSER_RESPONSE_ERROR
 };
 
-namespace http_parser
+struct Header
+{ 
+
+  std::string_view key;
+  std::string_view value;
+
+};
+
+class Parser
 {
 
-  struct Header
-  { 
-
-    std::string_view key;
-    std::string_view value;
-
-  };
-
-
-  class Parser
-  {
-
-public:
+  public:
 
     Parser() = default;
     Parser(char* buffer) : m_buffer(buffer), m_unhandledBuffer(buffer) {};
@@ -50,7 +44,7 @@ public:
     void clearChunk();
     void clear(char* buffer);
 
-private:
+  private:
 
     enum HTTP_PARSER_STATE : std::uint8_t 
     {
@@ -95,6 +89,4 @@ private:
 
     bool m_chunkSizeParsed = false;
 
-  };
-
-}
+};

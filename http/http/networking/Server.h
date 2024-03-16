@@ -5,12 +5,14 @@
 #include <functional>
 #include <sys/epoll.h>
 
+using RequestHandler = std::function<void(const Request* request)>;
+
 class Server
 {
 
 public:
 
-  Server(const std::function<void(const Request* request)>& callback) : m_callback(std::move(callback)) {}
+  Server(const RequestHandler& callback) : m_callback(std::move(callback)) {}
 
   int listen(const char* port);
 
@@ -22,8 +24,6 @@ private:
 
   friend class Request;
 
-  const std::function<void(const Request* request)> m_callback;
-
   struct CompareRequests
   {
 
@@ -33,6 +33,8 @@ private:
     }
 
   };
+
+  RequestHandler m_callback;
 
   std::vector<epoll_event> m_events;
   MinHeap<const Request*, CompareRequests> m_timeouts;

@@ -236,8 +236,8 @@ bool Request::m_receivingData() const
 std::optional<std::string_view> Request::m_getHeadersValue(std::string_view key) const
 {
 
-  using Header = std::tuple<std::string_view, std::string_view>;
-  std::vector<Header>::const_iterator iterator = std::find_if(headers.begin(), headers.end(), [&](const Header& header) {
+  using HeaderObject = std::tuple<std::string_view, std::string_view>;
+  std::vector<HeaderObject>::const_iterator iterator = std::find_if(headers.begin(), headers.end(), [&](const HeaderObject& header) {
     return std::get<0>(header) == key;
   });
 
