@@ -7,6 +7,7 @@
 
 * There are no json or query parsers.
 * Server currently does not support multithreading.
+* This server is just a fun project and is no near complete.
 
 ### hello
 
